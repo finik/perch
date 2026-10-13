@@ -1,0 +1,136 @@
+{
+  "name": "Work two more years",
+  "description": "The same made-up single person, but Alex keeps working through 2028: pay grows with prices, payroll taxes at 7.65%, the 401k filled and matched, and the employer's health plan until then.",
+  "planStart": 2027,
+  "jointValue": 0.0,
+  "jointCost": 0.0,
+  "ownValue": [
+    1200000.0
+  ],
+  "ownCost": [
+    800000.0
+  ],
+  "ownNote": [
+    ""
+  ],
+  "pretax": [
+    900000.0
+  ],
+  "roth": [
+    150000.0
+  ],
+  "ssMonthly": [
+    3100.0
+  ],
+  "ssSource": [
+    "Estimate"
+  ],
+  "chooseSsAges": true,
+  "ssAge": [
+    67.0
+  ],
+  "workUntil": [
+    2028
+  ],
+  "wages": [
+    140000.0
+  ],
+  "payrollTax": [
+    10710.0
+  ],
+  "pretaxSave": [
+    23500.0
+  ],
+  "matchSave": [
+    7000.0
+  ],
+  "rothSave": [
+    0.0
+  ],
+  "hsaSave": [
+    4300.0
+  ],
+  "collegeAbove": 1.0,
+  "netSpending": 80000.0,
+  "cushion": [
+    0.0
+  ],
+  "useHistoricalRates": true,
+  "stockReturn": 7.0,
+  "bondReturn": 4.0,
+  "noteReturn": 3.0,
+  "inflation": 3.0,
+  "dividendPercent": 0.6,
+  "stocksNow": 80.0,
+  "bondsNow": 10.0,
+  "cashNow": 10.0,
+  "stocksLater": 60.0,
+  "bondsLater": 25.0,
+  "cashLater": 10.0,
+  "healthSticker": 11000.0,
+  "healthAbove": 1.0,
+  "planTo": [
+    95.0
+  ],
+  "survivorPercent": 100.0,
+  "objective": "maxBequest",
+  "bequestFloor": 0.0,
+  "allowRoth": true,
+  "withdrawalOrder": "optimal",
+  "spendingProfile": "flat",
+  "smileDip": 15.0,
+  "smileIncrease": 12.0,
+  "smileDelay": 0.0,
+  "spendingSlack": 0.0,
+  "heirsRate": 30.0,
+  "taxCutsEnd": 2032,
+  "properties": [
+    {
+      "name": "Condo",
+      "use": "live",
+      "value": 600000.0,
+      "cost": 350000.0,
+      "mortgage": 120000.0,
+      "rate": 3.0,
+      "years": 8.0,
+      "sellYear": null,
+      "income": 0.0,
+      "growth": 0.0
+    }
+  ],
+  "children": [],
+  "spendingBands": [
+    {
+      "name": "Health costs before 75",
+      "amount": 3000.0,
+      "from": 2027,
+      "to": 2046,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Health costs from 75",
+      "amount": 6000.0,
+      "from": 2047,
+      "to": 2063,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Long-term care",
+      "amount": 100000.0,
+      "from": 2064,
+      "to": 2066,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Gifts to family",
+      "amount": 10000.0,
+      "from": 2027,
+      "to": 2045,
+      "grows": "prices",
+      "kind": "gift"
+    }
+  ]
+}

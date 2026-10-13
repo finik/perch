@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+# Scenarios hold personal finances and live outside the repo (~/.perch-scenarios).
+# This guards against a data folder placed here by mistake.
+/data/
+/.perch-scenarios/
+*.private.json

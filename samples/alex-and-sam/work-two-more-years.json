@@ -1,0 +1,161 @@
+{
+  "name": "Work two more years",
+  "description": "Same made-up household, but both keep working through 2028: pay grows with prices, payroll taxes at 7.65%, the 401k filled and matched, and the employer's health plan until they stop.",
+  "planStart": 2027,
+  "jointValue": 1800000.0,
+  "jointCost": 1200000.0,
+  "ownValue": [
+    150000.0,
+    80000.0
+  ],
+  "ownCost": [
+    100000.0,
+    60000.0
+  ],
+  "ownNote": [
+    "",
+    ""
+  ],
+  "pretax": [
+    1200000.0,
+    700000.0
+  ],
+  "roth": [
+    250000.0,
+    120000.0
+  ],
+  "ssMonthly": [
+    3400.0,
+    2900.0
+  ],
+  "ssSource": [
+    "Estimate",
+    "Estimate"
+  ],
+  "chooseSsAges": true,
+  "ssAge": [
+    67.0,
+    67.0
+  ],
+  "workUntil": [
+    2028,
+    2028
+  ],
+  "wages": [
+    180000.0,
+    95000.0
+  ],
+  "payrollTax": [
+    13770.0,
+    7268.0
+  ],
+  "pretaxSave": [
+    23500.0,
+    23500.0
+  ],
+  "matchSave": [
+    9000.0,
+    4750.0
+  ],
+  "rothSave": [
+    0.0,
+    0.0
+  ],
+  "hsaSave": [
+    8550.0,
+    0.0
+  ],
+  "collegeAbove": 1.0,
+  "netSpending": 120000.0,
+  "cushion": [
+    0.0,
+    0.0
+  ],
+  "useHistoricalRates": true,
+  "stockReturn": 7.0,
+  "bondReturn": 4.0,
+  "noteReturn": 3.0,
+  "inflation": 3.0,
+  "dividendPercent": 0.6,
+  "stocksNow": 80.0,
+  "bondsNow": 10.0,
+  "cashNow": 10.0,
+  "stocksLater": 60.0,
+  "bondsLater": 25.0,
+  "cashLater": 10.0,
+  "healthSticker": 22000.0,
+  "healthAbove": 1.0,
+  "planTo": [
+    92.0,
+    95.0
+  ],
+  "survivorPercent": 100.0,
+  "objective": "maxBequest",
+  "bequestFloor": 0.0,
+  "allowRoth": true,
+  "withdrawalOrder": "optimal",
+  "spendingProfile": "flat",
+  "smileDip": 15.0,
+  "smileIncrease": 12.0,
+  "smileDelay": 0.0,
+  "spendingSlack": 0.0,
+  "heirsRate": 30.0,
+  "taxCutsEnd": 2032,
+  "properties": [
+    {
+      "name": "Home",
+      "use": "live",
+      "value": 900000.0,
+      "cost": 450000.0,
+      "mortgage": 180000.0,
+      "rate": 3.0,
+      "years": 8.0,
+      "sellYear": null,
+      "income": 0.0,
+      "growth": 0.0
+    }
+  ],
+  "children": [
+    {
+      "name": "Child",
+      "born": 2010,
+      "collegeStart": 2028,
+      "years": 4.0,
+      "cost": 35000.0
+    }
+  ],
+  "spendingBands": [
+    {
+      "name": "Health costs before 75",
+      "amount": 4000.0,
+      "from": 2027,
+      "to": 2046,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Health costs from 75",
+      "amount": 8000.0,
+      "from": 2047,
+      "to": 2069,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Long-term care",
+      "amount": 100000.0,
+      "from": 2062,
+      "to": 2064,
+      "grows": "health",
+      "kind": "health"
+    },
+    {
+      "name": "Gifts to family",
+      "amount": 20000.0,
+      "from": 2027,
+      "to": 2050,
+      "grows": "prices",
+      "kind": "gift"
+    }
+  ]
+}

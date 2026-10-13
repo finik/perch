@@ -1,0 +1,11 @@
+{
+  "note": "Tax and benefit rules the page uses for milestones and the outcome summary. Owl applies its own rules when it solves.",
+  "medicareAge": 65,
+  "estateExemptionPerPerson": 15000000,
+  "estateRate": 0.40,
+  "requiredWithdrawalAge": [
+    {"bornFrom": 1960, "age": 75},
+    {"bornFrom": 1951, "age": 73},
+    {"bornFrom": 0, "age": 72}
+  ]
+}

@@ -1,0 +1,1791 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1012; --panel: #17181b; --aside: #1b1c20; --raise: #24262b; --button: #2e3138;
+    --line: #2a2c31; --line-soft: #24262b; --dash: #3a3c42;
+    --text: #f0efec; --soft: #c3c2b7; --muted: #8f8e86; --faint: #5a5c62;
+    --a: #d6588f; --a-text: #f2a0c4; --b: #3987e5; --b-text: #9cc3f5; --less: #f0a27e; --ok: #7fc8a4; --dot: #e0b04a;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 'IBM Plex Sans', system-ui, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; color: var(--soft); }
+  button.solid { background: var(--button); border: 0; color: var(--text); }
+  button.dashed { border: 1px dashed var(--dash); }
+  button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--soft); outline-offset: 1px; }
+  a { color: var(--text); }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+
+  header { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1400px; margin: 0 auto; padding: 10px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+  .brand { display: flex; flex-direction: column; }
+  .brand b { font-weight: 600; font-size: 16px; }
+  nav { display: flex; gap: 4px; }
+  nav button { border: 0; padding: 8px 14px; border-radius: 6px; color: var(--soft); }
+  nav button.on { color: var(--text); background: var(--raise); }
+  .picks { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+  .pick { display: flex; align-items: center; gap: 8px; color: var(--soft); }
+  .chip { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  /* Dropdowns: a button and a list drawn by the page, never the browser's own. */
+  .dd { position: relative; display: inline-flex; min-width: 0; width: 100%; }
+  .dd-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; color: var(--text); text-align: left; }
+  .dd-btn:hover:not(:disabled) { border-color: var(--dash); }
+  .dd-btn:disabled { cursor: default; opacity: 0.55; }
+  .dd-btn svg { flex: none; transition: transform 0.15s; }
+  .dd-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dd-pop { position: fixed; z-index: 100; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 1px; }
+  .dd-pop button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-radius: 5px; padding: 7px 10px; text-align: left; color: var(--soft); background: transparent; white-space: nowrap; }
+  .dd-pop button:hover:not(:disabled), .dd-pop button:focus-visible { background: var(--button); color: var(--text); outline: none; }
+  .dd-pop button:disabled { color: var(--muted); cursor: default; }
+  .dd-pop button .tick { width: 12px; flex: none; }
+  .dd-pop button[aria-selected="true"] { color: var(--text); }
+  .dd-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+  .pick .dd { width: auto; }
+  .pick .dd-btn { min-width: 200px; }
+  .pick.one .dd-btn { border-color: var(--dash); color: var(--text); }
+  .pick.A .dd-btn { border-color: var(--a); color: var(--a-text); }
+  .pick.B .dd-btn { border-color: var(--b); color: var(--b-text); }
+  .pick.B.none .dd-btn { border-color: var(--line); color: var(--soft); }
+  .dd.field .dd-btn { background: var(--bg); font-family: var(--mono); font-size: 13px; padding: 6px 10px; }
+  .dd.field.text .dd-btn { font-family: inherit; }
+  .dd.field.A .dd-btn { color: var(--a-text); }
+  .dd.field.B .dd-btn { color: var(--b-text); }
+  .dd.field.A.diff .dd-btn { border-color: var(--a); }
+  .dd.field.B.diff .dd-btn { border-color: var(--b); }
+  .dd.house { width: auto; }
+  .dd.house .dd-btn { background: transparent; border: 0; padding: 2px 0; gap: 6px; color: var(--soft); font-size: 12px; }
+  .dd.house .dd-btn:hover { color: var(--text); }
+  .status { font-size: 12px; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .status.ok { color: var(--ok); }
+  .status.bad { color: var(--less); }
+
+  main { max-width: 1400px; margin: 0 auto; padding: 16px 24px 64px; display: flex; flex-direction: column; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  .timeline { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 6px 11px; min-height: 34px; color: var(--soft); }
+  .seg button.on { background: var(--button); color: var(--text); }
+  .legend { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--soft); align-items: center; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+  .charts { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .chart-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+  .chart-head .mono { color: var(--muted); }
+  svg.chart { width: 100%; height: auto; display: block; }
+  svg.chart text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+  .stale { opacity: 0.45; }
+  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+
+  .years { border: 1px solid var(--line-soft); border-radius: 6px; }
+  .years-head { position: sticky; top: var(--bar-h, 64px); z-index: 3; overflow: hidden; background: #1d1e22; border-radius: 6px 6px 0 0; border-bottom: 1px solid var(--line); }
+  .years-body { overflow-x: auto; }
+  .years table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-family: var(--mono); font-size: 12px; }
+  .years th { background: #1d1e22; color: var(--soft); font-weight: 500; padding: 6px 10px; text-align: right; white-space: nowrap; }
+  .years th.group { text-align: center; color: var(--text); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; border-bottom: 1px solid var(--line-soft); }
+  .years td { padding: 6px 10px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .years .stick, .years .stick2 { position: sticky; z-index: 1; background: var(--panel); }
+  .years th.stick, .years th.stick2 { background: #1d1e22; vertical-align: bottom; }
+  .years .stick { left: 0; }
+  .years .stick2 { left: 56px; border-right: 1px solid var(--line); }
+  .years tr.row.on .stick, .years tr.row.on .stick2 { background: var(--raise); }
+  .years tr.row { cursor: pointer; }
+  .years tr.row td { border-top: 1px solid var(--line-soft); }
+  .years tr.row.on { background: var(--raise); }
+  .years .l { text-align: left; }
+  .years .sep { border-right: 1px solid var(--line); }
+
+  aside { position: sticky; top: calc(var(--bar-h, 64px) + 12px); background: var(--aside); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .yearnav { display: flex; align-items: center; gap: 6px; }
+  .yearnav button { width: 32px; height: 32px; padding: 0; background: var(--raise); display: inline-flex; align-items: center; justify-content: center; }
+  .yearnav .big { font-size: 22px; font-weight: 600; font-family: var(--mono); min-width: 64px; text-align: center; }
+  table.detail { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.detail th, table.detail td { padding: 4px; text-align: right; }
+  table.detail td { font-family: var(--mono); }
+  table.detail thead th { color: var(--muted); font-weight: 500; }
+  table.detail tbody tr { border-top: 1px solid var(--line-soft); }
+  .l { text-align: left !important; }
+  .sub { padding-left: 14px !important; font-weight: 400; color: var(--soft); }
+  .top { font-weight: 500; color: var(--text); }
+  .events { border-top: 1px solid var(--line); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .events div { display: flex; gap: 6px; align-items: baseline; }
+  /* The two scenarios are told apart by color only: pink on the left, blue on the right. */
+  .tA { color: var(--a-text); }
+  .tB { color: var(--b-text); }
+  .dots { display: inline-flex; gap: 3px; flex: none; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 4px; }
+  .dot.A { background: var(--a); }
+  .dot.B { background: var(--b); }
+  .same { color: var(--faint); }
+
+
+  .inputs-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .inputs-head label { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--soft); font-size: 13px; }
+  /* Editing from Risk: one scenario, so one column and no comparison marks. */
+  .single .grid3 { grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); }
+  .single .grid3 > :nth-child(3) { display: none; }
+  .single .differs, .single .section .sum, .single .inputs-head label { display: none; }
+  .single .in.A.diff, .single .dd.field.A.diff .dd-btn { border-color: var(--line); }
+  .grid3 { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; }
+  .section { border-bottom: 1px solid var(--line-soft); }
+  .clones { padding: 10px 16px; border-bottom: 1px solid var(--line-soft); }
+  button.clone.A { color: var(--a-text); border-color: var(--a); }
+  button.clone.B { color: var(--b-text); border-color: var(--b); }
+  .form.one { grid-template-columns: 1fr; }
+  textarea.in { resize: vertical; font-family: inherit; }
+  .section > button { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 0; padding: 11px 16px; text-align: left; min-height: 44px; color: var(--text); }
+  .section > button .name { font-weight: 500; }
+  .kind { font-size: 11px; padding: 1px 6px; border-radius: 3px; border: 1px solid; }
+  .differs { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: var(--dot); }
+  .section > button .sum { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .section .body { padding: 0 16px 12px; }
+  .section .grid3 { padding: 4px 0; }
+  .field-label { color: var(--soft); font-size: 13px; }
+  .in { background: var(--bg); border-radius: 6px; padding: 6px 10px; font-family: var(--mono); font-size: 13px; min-width: 0; width: 100%; color: var(--text); border: 1px solid var(--line); }
+  .in.A { color: var(--a-text); }
+  .in.B { color: var(--b-text); }
+  .in.A.diff { border-color: var(--a); }
+  .in.B.diff { border-color: var(--b); }
+  .in.text { font-family: inherit; }
+  .boolbox { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft); }
+  .boolbox input { width: 16px; height: 16px; accent-color: var(--b); }
+  .boolbox.A { color: var(--a-text); }
+  .boolbox.A input { accent-color: var(--a); }
+  .boolbox.B { color: var(--b-text); }
+  .summary { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .summary span { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .summary span.diff { font-weight: 600; }
+  .summary button { flex: none; min-height: 32px; padding: 6px 12px; }
+  .note { color: var(--muted); font-size: 12px; padding-top: 4px; }
+  .tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; margin-left: 6px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); font-size: 10px; font-weight: 600; cursor: help; vertical-align: 1px; }
+  .tip:hover, .tip:focus { color: var(--text); border-color: var(--soft); outline: none; }
+  .tip:hover::after, .tip:focus::after { content: attr(data-help); position: absolute; left: 0; top: 20px; z-index: 30; width: 300px; padding: 8px 10px; background: #1f2126; border: 1px solid var(--line); border-radius: 6px; color: var(--text); font: 400 12px/1.45 'IBM Plex Sans', system-ui, sans-serif; white-space: normal; text-align: left; }
+
+  .outcome { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .outcome table { width: 100%; max-width: 980px; border-collapse: collapse; font-size: 13px; }
+  .outcome th, .outcome td { padding: 6px 8px; text-align: right; }
+  .outcome td { font-family: var(--mono); }
+  .outcome thead th { color: var(--muted); font-size: 12px; font-weight: 500; }
+  .outcome tbody tr { border-top: 1px solid var(--line-soft); }
+  .outcome tbody tr.head { border-top-color: var(--dash); }
+  .outcome tr.head th, .outcome tr.head td { font-weight: 600; }
+  .outcome th.sub { padding-left: 24px !important; }
+
+  .scrim { position: fixed; inset: 0; z-index: 50; background: rgba(5, 6, 8, 0.72); display: flex; align-items: flex-start; justify-content: center; padding: 48px 24px; overflow: auto; }
+  .dialog { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; }
+  .dialog-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .dialog-head .title { font-weight: 600; font-size: 16px; }
+  .dialog-head .close { margin-left: auto; width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .dialog .pad { padding: 14px 18px; }
+  .dialog.solving { align-items: center; text-align: center; gap: 8px; padding: 28px 24px; }
+  .dialog.solving .title { font-weight: 600; font-size: 16px; }
+  .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--text); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+  button.primary { background: var(--text); color: var(--bg); font-weight: 500; }
+  .dialog .foot { display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line-soft); }
+  .todo-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 14px; }
+  .todo-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .todo-cols.one { grid-template-columns: minmax(0, 1fr); }
+  .todo { border-top: 3px solid var(--line); padding-top: 10px; }
+  .todo-head { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .todo-who { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--soft); margin: 12px 0 4px; }
+  .todo ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.4; }
+  .todo-open { width: 100%; margin: 4px 0 8px; }
+  .dialog .foot button:disabled { opacity: 0.35; cursor: default; }
+  @media (max-width: 760px) { .todo-cols { grid-template-columns: 1fr; } }
+  .form .person { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px 18px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+  .form .fixed { padding: 7px 0; color: var(--text); }
+  @media (max-width: 640px) { .form .person { grid-template-columns: 1fr; } }
+  .risk { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .dd-inline { width: 220px; }
+  .dd-inline.wide { width: 300px; }
+  .how { border: 1px solid var(--line); border-radius: 8px; background: var(--aside); padding: 4px 14px 10px; font-size: 13px; color: var(--soft); line-height: 1.55; }
+  .how summary { cursor: pointer; padding: 8px 0; color: var(--text); font-weight: 500; }
+  .how dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 16px; margin: 4px 0 0; }
+  .how dt { color: var(--muted); }
+  .how dd { margin: 0; }
+  .how ol { margin: 0; padding-left: 18px; }
+  table.regret { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.regret th { text-align: left; color: var(--muted); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  table.regret td { padding: 7px 10px; border-bottom: 1px solid var(--line-soft); }
+  table.regret tr.on td { background: var(--raise); }
+  table.regret .short { color: #e5484d; font-weight: 600; }
+  .rwrap { position: relative; }
+  .dd-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+  .stage { margin-top: 12px; }
+  .stage-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 80px; }
+  .stage-center .bar-track { width: min(520px, 80%); }
+  .big-run { font-size: 17px; padding: 14px 28px; border-radius: 10px; }
+  /* At the bottom of the chart, where the paths that ran short are drawn once found. */
+  .rwrap .rbtn { position: absolute; bottom: 44px; left: calc(64 / 1200 * 100% + (100% - 76 / 1200 * 100%) / 2); transform: translateX(-50%);
+    white-space: nowrap; padding: 10px 18px; border-radius: 8px; border: 1px solid #e5484d; background: #2a1517; color: #ffb4b6; font-weight: 600; }
+  .rwrap button.rbtn:hover { background: #3a1a1d; }
+  .rchart .pl { cursor: pointer; }
+  .rchart .pl:hover .vis { stroke-opacity: 1; stroke-width: 2.5; }
+  .pfull { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .pfull-body { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+  .pfull .pc-year { margin-bottom: 6px; }
+  @media (max-width: 900px) { .pfull-body { grid-template-columns: 1fr; } }
+  .rdetail { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .rdetail-head { display: flex; align-items: center; gap: 12px; height: 38px; }
+  .rdetail-head .dd-inline { flex: 0 0 240px; }
+  .rline { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  .rline .short { color: #e5484d; font-weight: 600; } .rline .edge { color: #d9a13b; font-weight: 600; }
+  .fan-read.rline { display: flex; flex-wrap: nowrap; }
+  .failing { margin-top: 12px; display: grid; gap: 8px; font-size: 13px; }
+  .failing > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .failing .short { color: #e5484d; font-weight: 600; margin-right: 6px; }
+  .failing .edge { color: #d9a13b; font-weight: 600; margin-right: 6px; }
+  .failing .pathpick { margin: 2px 4px 2px 0; padding: 2px 8px; font-size: 12px; border-radius: 10px; background: transparent; border: 1px solid #3a3c42; color: #f0efec; cursor: pointer; }
+  .failing .pathpick.red { border-color: #e5484d; } .failing .pathpick.amber { border-color: #d9a13b; } .failing .pathpick.grey { border-color: #6f7278; }
+  .failing .pathpick.on { background: #6fc2b5; border-color: #6fc2b5; color: #111; }
+  .risk-lead { margin: 2px 0 4px; color: var(--soft); font-size: 13px; max-width: 980px; line-height: 1.5; }
+  .risk-run { padding: 40px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .bar-track { width: min(420px, 90%); height: 8px; background: var(--raise); border-radius: 4px; overflow: hidden; }
+  .bar-track div { height: 100%; transition: width 0.4s; }
+  .risk-stale { padding: 8px 12px; border: 1px solid var(--dash); border-radius: 6px; color: var(--soft); display: flex; align-items: center; gap: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tile { background: var(--aside); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .tile .big { font-size: 22px; color: var(--text); }
+  @media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .fan-read { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--soft); min-height: 18px; }
+  .fan-read b { color: var(--text); font-weight: 500; }
+  .legend .sw { width: 12px; height: 10px; border-radius: 2px; display: inline-block; }
+  .legend .ln { width: 16px; height: 0; border-top: 2px solid #f0efec; display: inline-block; }
+  .legend .ln.dash { border-top-style: dashed; }
+  .risk-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; color: var(--soft); min-height: 34px; }
+  .clone-row { display: flex; align-items: center; gap: 14px; justify-self: start; }
+  a.export { color: var(--soft); font-size: 13px; text-decoration: none; border-bottom: 1px dotted var(--dash); }
+  a.export:hover { color: var(--text); }
+  .form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+  .form label { display: flex; flex-direction: column; gap: 5px; color: var(--soft); font-size: 13px; }
+  .bands-row { display: grid; grid-template-columns: 24px 24px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 0.7fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 0.8fr) 44px; gap: 10px; align-items: center; padding: 5px 18px; }
+  .bands-row.head { color: var(--muted); font-size: 12px; padding: 10px 18px; }
+  .bands-row + .bands-row { border-top: 1px solid var(--line-soft); }
+  .bands-row .x { width: 44px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .danger { color: var(--less); border-color: #5a3a2c; }
+  .handle { cursor: ew-resize; }
+
+  @media (max-width: 1000px) {
+    .split { grid-template-columns: 1fr; }
+    aside { position: static; }
+  }
+  @media (max-width: 760px) {
+    .bar, main { padding-left: 16px; padding-right: 16px; }
+    .picks { margin-left: 0; }
+    .grid3 { grid-template-columns: 1fr 1fr; }
+    .grid3 > :first-child { grid-column: 1 / -1; }
+    .form { grid-template-columns: 1fr; }
+    .bands-row { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 44px; }
+    .bands-row.head { display: none; }
+  }
+</style>
+</head>
+<body>
+<header><div class="bar" id="bar"></div></header>
+<main id="main"></main>
+<div id="modal"></div>
+<script>
+"use strict";
+// Everything about the household, the scenarios and the rules is loaded from the server.
+let CONFIG = null, HOUSE = null, LIST = [], HOUSES = [];
+const SLOTS = { A: { doc: null, busy: "", error: "", again: false, seconds: null }, B: { doc: null, busy: "", error: "", again: false, seconds: null } };
+const UI = { page: location.hash === "#risk" ? "risk" : "compare", riskSlot: "A", riskKind: "history", riskLife: "0", riskMeasure: "left", riskView: "band", riskPath: null, riskYear: null, editing: false, view: "chart", mode: "side", stack: "worth", metric: "worth", year: null, open: { "Spending": true, "Real estate": true }, diffOnly: false, modal: null, dollars: "today" };
+// Category colors stay clear of pink and blue, which mean the two scenarios.
+const STACK = [["taxable", "Taxable", "#2a9d8f"], ["pretax", "Pre-tax", "#d95926"], ["roth", "Roth", "#8f7fe0"], ["re", "Real estate", "#c98500"]];
+// What the money is spent on, bottom to top. Taxes are not spending here; they have their own view.
+const SPEND = [["base", "Base", "#2a9d8f"], ["health", "Health", "#d95926"], ["mortgage", "Mortgage", "#8f7fe0"], ["college", "College", "#c98500"], ["gifts", "Gifts", "#5b6abf"], ["other", "Other bands", "#6f7278"]];
+// Year table column groups: label and row key. Each group has the pink and the blue value.
+const TABLE_GROUPS = [["Net worth", "worth"], ["Spending", "outflow"], ["Health", "health"], ["Tax", "tax"], ["Roth conversion", "conv"], ["Social Security", "ss"]];
+const METRICS = { worth: ["Net worth", "Net worth"], outflow: ["Spending", "Spending, all of it"], health: ["Health", "Health costs"], tax: ["Tax", "Tax paid"], conv: ["Roth conversion", "Roth conversion"], ss: ["Social Security", "Social Security"] };
+const BAND_COLORS = ["#2a9d8f", "#e0b04a", "#5b6abf", "#d95926", "#b3d36b", "#9a9a4a", "#6f7278"];
+const KIND_COLOR = { "Fact": "#6fc2b5", "Choice": "#e0b04a", "Assumption": "#b3a7f0", "Fact and choice": "#c3c2b7" };
+const CHEVRON = '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 3.5L5 7l3.5-3.5" fill="none" stroke="#c3c2b7" stroke-width="1.5"/></svg>';
+const CLOSE = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="#c3c2b7" stroke-width="1.5"/></svg>';
+
+// ---------- formatting ----------
+// A dropdown drawn by the page. The hidden input holds the value and carries the data-* and id
+// attributes, so the change handler and the forms read it like any other field.
+// options: [{ value, label, disabled }] or { divider: true }.
+// An option may carry a colored dot after its label (dot: color, dotTitle: what it means).
+const ddText = (o) => `${esc(o.label || "")}${o.dot ? ` <i class="dd-dot" style="background:${o.dot}" title="${esc(o.dotTitle || "")}"></i>` : ""}`;
+function dropdown({ attrs = "", value, options, cls = "", label = "", disabled = false }) {
+  const cur = options.find((o) => !o.divider && o.value === value) || {};
+  return `<span class="dd ${cls}"><input type="hidden" ${attrs} value="${esc(value == null ? "" : value)}">`
+    + `<button type="button" class="dd-btn" aria-haspopup="listbox" aria-expanded="false" ${label ? `aria-label="${esc(label)}"` : ""} ${disabled ? "disabled" : ""} data-options="${esc(JSON.stringify(options))}">`
+    + `<span class="dd-label">${ddText(cur)}</span>${CHEVRON}</button></span>`;
+}
+let DD = null;
+function ddClose(focusBack) {
+  if (!DD) return;
+  DD.pop.remove(); DD.btn.setAttribute("aria-expanded", "false");
+  if (focusBack) DD.btn.focus();
+  DD = null;
+}
+function ddOpen(btn) {
+  ddClose();
+  const input = btn.parentElement.querySelector("input"), options = JSON.parse(btn.dataset.options), r = btn.getBoundingClientRect();
+  const pop = document.createElement("div");
+  pop.className = "dd-pop"; pop.setAttribute("role", "listbox");
+  pop.innerHTML = options.map((o) => o.divider ? '<div class="dd-sep" role="separator"></div>'
+    : `<button type="button" role="option" data-v="${esc(o.value)}" aria-selected="${o.value === input.value}" ${o.disabled ? "disabled" : ""}><span class="tick">${o.value === input.value ? TICK : ""}</span>${ddText(o)}</button>`).join("");
+  document.body.appendChild(pop);
+  const below = innerHeight - r.bottom - 8, h = Math.min(pop.scrollHeight, 340);
+  pop.style.minWidth = Math.max(r.width, 160) + "px";
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + "px";
+  pop.style.top = (below >= h || below >= r.top ? r.bottom + 4 : r.top - h - 4) + "px";
+  btn.setAttribute("aria-expanded", "true");
+  DD = { btn, input, pop };
+  (pop.querySelector('[aria-selected="true"]:not(:disabled)') || pop.querySelector("button:not(:disabled)") || pop).focus({ preventScroll: true });
+  DD.opened = Date.now();
+}
+function ddChoose(v) {
+  const { btn, input } = DD, o = JSON.parse(btn.dataset.options).find((x) => x.value === v);
+  ddClose(true);
+  if (!o || o.disabled) return;
+  input.value = v; btn.querySelector(".dd-label").innerHTML = ddText(o);
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+const TICK = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function money(v) {
+  if (v == null || isNaN(v)) return "—";
+  const s = v < 0 ? "−" : ""; v = Math.abs(v);
+  if (v >= 1e6) return s + "$" + (v / 1e6).toFixed(v >= 1e7 ? 1 : 2) + "M";
+  if (v < 500) return "$0";
+  return s + "$" + Math.round(v / 1000) + "k";
+}
+const dollars = (v) => v == null || v === "" ? "" : "$" + Math.round(Number(v)).toLocaleString("en-US");
+// A scenario's name in its color: pink for the left slot, blue for the right.
+// The second plan is optional: View shows one plan until another is picked to compare with.
+const two = () => !!SLOTS.B.doc;
+const slots = () => (two() ? ["A", "B"] : ["A"]);
+const nameOf = (slot) => `<span class="t${slot}">${esc(SLOTS[slot].doc.name)}</span>`;
+const COLOR = { A: "#d6588f", B: "#3987e5" };
+function ageText(a) { const y = Math.floor(a), m = Math.round((a - y) * 12); return m ? y + "y " + m + "m" : String(y); }
+function niceStep(span) { const raw = Math.max(span, 1) / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+const tip = (help) => help ? `<span class="tip" tabindex="0" data-help="${esc(help)}" aria-label="${esc(help)}">?</span>` : "";
+const people = () => HOUSE ? HOUSE.people : [];
+
+// ---------- server ----------
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok && res.status !== 409) throw new Error(data.error || res.statusText);
+  return { status: res.status, data };
+}
+
+async function load() {
+  CONFIG = (await api("GET", "/api/config")).data;
+  LIST = (await api("GET", "/api/scenarios")).data;
+  HOUSES = (await api("GET", "/api/households")).data;
+  const saved = (() => { try { return JSON.parse(localStorage.getItem("picks") || "{}"); } catch (e) { return {}; } })();
+  const first = LIST.find((s) => s.id === saved.A) || LIST[0];
+  if (!first) { document.getElementById("main").innerHTML = '<div class="empty">No scenarios yet.</div>'; return; }
+  HOUSE = (await api("GET", "/api/households/" + first.household)).data;
+  await pick("A", first.id, true);
+  render();
+}
+
+function openHouse(mode) {
+  UI.modal = mode === "new"
+    ? { kind: "house", mode, state: HOUSE.state || "", people: [{ name: "", born: "", sex: "F" }, { name: "", born: "", sex: "M" }] }
+    : { kind: "house", mode, state: HOUSE.state || "", people: people().map((p) => ({ name: p.name, born: String(p.born), sex: p.sex || "F" })) };
+  renderModal();
+  document.getElementById("hh-name-0").focus();
+}
+function readHouseForm() {
+  const val = (id) => (document.getElementById(id) || { value: "" }).value.trim();
+  return { state: val("hh-state"), people: UI.modal.people.map((_, i) => ({ name: val("hh-name-" + i), born: val("hh-born-" + i), sex: val("hh-sex-" + i) || "F" })) };
+}
+
+// Scenarios compare only within one household, so switching household shows its first scenario alone.
+async function switchHouse(id) {
+  const mine = LIST.filter((s) => s.household === id);
+  if (!mine.length) return;
+  HOUSE = (await api("GET", "/api/households/" + id)).data;
+  UI.year = null;
+  SLOTS.B.doc = null;
+  await pick("A", mine[0].id, true);
+  render();
+}
+
+// Deletes what Owl worked out for this household (its plans and Risk runs); the inputs stay, and
+// the plans on screen are solved again.
+async function clearCache() {
+  if (!confirm(`Clear every saved result for ${HOUSE.name}? This deletes the solved plans and all Risk Analysis runs. Your inputs stay, and the plans on screen are solved again.`)) return;
+  try { await api("POST", `/api/households/${HOUSE.id}/clear-cache`); } catch (err) { alert(err.message); return; }
+  for (const k in RISK) if (k.startsWith(HOUSE.id + "/")) { clearTimeout(POLL[k]); delete POLL[k]; delete RISK[k]; }
+  LIST = (await api("GET", "/api/scenarios")).data;
+  UI.riskPath = null;
+  // Load the plans on screen again; with no saved result, each is solved.
+  const ids = slots().map((s) => [s, SLOTS[s].doc.id]);
+  for (const [s] of ids) SLOTS[s].doc = null;
+  for (const [s, id] of ids) await pick(s, id, true);
+  render();
+}
+
+async function pick(slot, id, quiet) {
+  if (!id) {
+    Object.assign(SLOTS[slot], { doc: null, error: "", busy: "", seconds: null, dirty: false });
+    if (UI.mode === "diff") UI.mode = "side";
+    if (!quiet) render();
+    return;
+  }
+  const other = SLOTS[slot === "A" ? "B" : "A"];
+  SLOTS[slot].doc = other.doc && other.doc.id === id ? other.doc : (await api("GET", "/api/scenarios/" + id)).data;
+  SLOTS[slot].error = ""; SLOTS[slot].seconds = null; SLOTS[slot].dirty = false;
+  try { localStorage.setItem("picks", JSON.stringify({ A: SLOTS.A.doc && SLOTS.A.doc.id, B: SLOTS.B.doc && SLOTS.B.doc.id })); } catch (e) { /* private window */ }
+  // While editing, an unsolved scenario waits for Done.
+  if (!SLOTS[slot].doc.result && !UI.editing) solve(slot);
+  if (!quiet) render();
+}
+
+// Every change saves, then Owl solves again. A change made while Owl is solving waits for it.
+// When both columns show the same scenario, they share one copy, so an edit in either is the edit.
+function mirror(slot) {
+  const other = slot === "A" ? "B" : "A", S = SLOTS[slot], O = SLOTS[other];
+  if (O.doc && S.doc && O.doc.id === S.doc.id) Object.assign(O, { doc: S.doc, dirty: S.dirty, seconds: S.seconds, error: S.error });
+}
+
+async function save(slot) {
+  const S = SLOTS[slot], doc = S.doc;
+  const body = Object.assign({}, doc); delete body.result; delete body.stale;
+  // Only the newest save's reply is used: an older one landing late would undo a newer edit.
+  const seq = S.saveSeq = (S.saveSeq || 0) + 1;
+  S.busy = "Saving"; renderBar();
+  try {
+    const saved = (await api("PUT", "/api/scenarios/" + doc.id, body)).data;
+    LIST = (await api("GET", "/api/scenarios")).data;
+    if (seq !== S.saveSeq) return;
+    // Another plan was picked meanwhile: the save landed, nothing here to update.
+    if (!S.doc || S.doc.id !== doc.id) { S.busy = ""; renderBar(); return; }
+    if (saved.result) { S.doc = saved; S.busy = ""; mirror(slot); renderBar(); return; }
+    S.doc = Object.assign(saved, { result: doc.result, stale: true });
+    S.busy = "";
+    if (UI.editing) S.dirty = true;
+    mirror(slot);
+    // While editing, the solve waits for Done.
+    if (UI.editing) { S.dirty = true; renderBar(); } else solve(slot);
+  } catch (err) { if (seq !== S.saveSeq) return; S.busy = ""; S.error = err.message; render(); }
+}
+
+async function solve(slot) {
+  const S = SLOTS[slot];
+  if (!S.doc) return;
+  if (S.busy === "Solving") { S.again = true; return S.running; }
+  S.running = solveOnce(slot);
+  return S.running;
+}
+async function solveOnce(slot) {
+  const S = SLOTS[slot];
+  S.busy = "Solving"; S.error = ""; renderBar();
+  const id = S.doc.id;
+  try {
+    const { status, data } = await api("POST", "/api/scenarios/" + id + "/solve");
+    if (!S.doc || S.doc.id !== id) {
+      // Another plan was picked (or none) while this one solved; solve the new one if it asked.
+      S.busy = "";
+      if (S.again && S.doc) { S.again = false; return solveOnce(slot); }
+      S.again = false; return;
+    }
+    if (status === 409) S.again = true;
+    else {
+      S.doc = data; S.seconds = data.result.seconds; mirror(slot);
+      // Risk results kept on the page may now be out of date; the server says so on the next load.
+      Object.keys(RISK).forEach((k) => { if (k.startsWith(id + "|") && !riskBusy(RISK[k])) delete RISK[k]; });
+    }
+  } catch (err) { if (S.doc && S.doc.id === id) S.error = err.message; }
+  S.busy = "";
+  if (S.again) { S.again = false; return solveOnce(slot); }
+  S.dirty = false;
+  if (!UI.editing) render(); else renderBar();
+}
+
+// Done: wait for saves to land, solve what changed behind a spinner, then show the results.
+async function finishEditing() {
+  UI.modal = { kind: "solving" }; renderModal();
+  while (slots().some((s) => SLOTS[s].busy === "Saving")) await new Promise((r) => setTimeout(r, 100));
+  const same = two() && SLOTS.A.doc.id === SLOTS.B.doc.id;
+  const todo = slots().filter((s) => (SLOTS[s].dirty || !SLOTS[s].doc.result || SLOTS[s].busy === "Solving") && !(same && s === "B"));
+  UI.modal = { kind: "solving", slots: todo }; renderModal();
+  await Promise.all(todo.map((s) => SLOTS[s].busy === "Solving" ? SLOTS[s].running : solve(s)));
+  const bad = slots().filter((s) => SLOTS[s].error);
+  if (bad.length) { UI.modal = { kind: "failed", slots: bad }; render(); return; }
+  UI.modal = null; UI.editing = false; render(); window.scrollTo(0, 0);
+}
+
+// ---------- the plan, year by year ----------
+function rowsOf(doc) {
+  const t = doc && doc.result && doc.result.timeline;
+  if (!t) return [];
+  return t.map((r) => {
+    const row = { year: r.year, taxable: r.taxable, pretax: r.pretax, roth: r.roth, re: r.realEstate, debt: r.debt, spend: r.spending,
+      tax: r.tax, fed: r.federal, gains: r.gainsTax, niit: r.niit, state: r.state, bracket: r.bracket, conv: r.rothMoved, ss: r.ss,
+      insurance: r.insurance || 0, medicare: r.medicare || 0, worth: r.taxable + r.pretax + r.roth + r.realEstate - r.debt };
+    const parts = { base: r.spending, health: row.insurance + row.medicare, mortgage: 0, college: 0, gifts: 0, other: 0 };
+    let medical = 0;
+    extrasOf(doc, r.year).forEach((x) => {
+      parts[{ mortgage: "mortgage", college: "college", health: "health", gift: "gifts" }[x.kind] || "other"] += x.amount;
+      if (x.kind === "health") medical += x.amount;
+    });
+    const outflow = SPEND.reduce((t, [k]) => t + parts[k], 0);
+    return Object.assign(row, parts, { outflow, medical, living: outflow - parts.mortgage });
+  });
+}
+function inflationOf(doc) { return (doc.result && doc.result.inflation) || (doc.useHistoricalRates ? 0.03 : (doc.inflation || 0) / 100); }
+function payment(p) { if (!p.mortgage || !p.years) return 0; const r = (p.rate || 0) / 100; return r ? p.mortgage * r / (1 - Math.pow(1 + r, -p.years)) : p.mortgage / p.years; }
+// Extra spending on top of the base, in today's dollars, split by what it is for.
+function extrasOf(doc, year) {
+  const out = [], start = doc.planStart, infl = inflationOf(doc);
+  (doc.properties || []).forEach((p) => { if (p.mortgage && p.years && year < start + p.years && (!p.sellYear || year < p.sellYear)) out.push({ what: "Mortgage", kind: "mortgage", amount: payment(p) / Math.pow(1 + infl, year - start) }); });
+  (doc.children || []).forEach((c) => { if (year >= c.collegeStart && year < c.collegeStart + c.years) out.push({ what: "College", kind: "college", amount: c.cost * Math.pow(1 + (doc.collegeAbove || 0) / 100, year - start) }); });
+  (doc.spendingBands || []).forEach((b, i) => { if (year >= b.from && year <= b.to) out.push({ what: b.name, kind: b.kind, band: i, amount: b.amount * (b.grows === "health" ? Math.pow(1 + (doc.healthAbove || 0) / 100, year - start) : 1) }); });
+  return out;
+}
+function claimAges(doc) { return doc.chooseSsAges && doc.result && doc.result.ssAges ? doc.result.ssAges : doc.ssAge; }
+function rmdAge(born) { const r = CONFIG.rules.requiredWithdrawalAge.find((x) => born >= x.bornFrom); return r ? r.age : 73; }
+
+function milestones(doc) {
+  const rows = rowsOf(doc); if (!rows.length) return [];
+  const out = [], end = rows[rows.length - 1].year, start = doc.planStart, ages = claimAges(doc);
+  out.push({ year: start, label: "Plan starts" });
+  if (doc.taxCutsEnd) out.push({ year: doc.taxCutsEnd, label: "Lower tax rates assumed to end" });
+  (doc.children || []).forEach((c) => { if (c.years > 0) out.push({ year: c.collegeStart, label: c.name + " starts college" }); });
+  (doc.properties || []).forEach((p) => {
+    if (p.mortgage && p.years && (!p.sellYear || p.sellYear > start + p.years - 1)) out.push({ year: start + p.years - 1, label: "Mortgage on " + p.name + " paid off" });
+    if (p.sellYear) out.push({ year: p.sellYear, label: p.name + " sold" });
+  });
+  people().forEach((p, i) => {
+    if ((doc.workUntil || [])[i]) out.push({ year: doc.workUntil[i], label: p.name + "'s last year of work" });
+    out.push({ year: p.born + CONFIG.rules.medicareAge, label: p.name + " on Medicare" });
+    out.push({ year: p.born + Math.floor(ages[i]), label: p.name + " claims Social Security at " + ageText(ages[i]) });
+    out.push({ year: p.born + rmdAge(p.born), label: p.name + " reaches required-withdrawal age" });
+    if (p.born + doc.planTo[i] < end) out.push({ year: p.born + doc.planTo[i], label: "Plan assumes " + p.name + " lives to " + doc.planTo[i] });
+  });
+  const empty = rows.find((r, i) => i > 0 && r.pretax < 1 && rows[i - 1].pretax >= 1);
+  if (empty) out.push({ year: empty.year, label: "Pre-tax accounts empty" });
+  return out.filter((m) => m.year >= start && m.year <= end);
+}
+
+// ---------- header ----------
+// One menu for households: switch, edit this one, or start a new one.
+function houseMenu() {
+  const homes = HOUSES.filter((h) => LIST.some((s) => s.household === h.id) || h.id === HOUSE.id);
+  return dropdown({ attrs: 'data-act="house"', value: HOUSE.id, cls: "house", label: "Household",
+    options: homes.map((h) => ({ value: h.id, label: h.name }))
+      .concat([{ divider: true }, { value: "__edit", label: "Edit household…" }, { value: "__new", label: "New household…" }, { value: "__clear", label: "Clear saved results…" }]) });
+}
+function renderBar() {
+  ddClose();
+  const A = SLOTS.A.doc, B = SLOTS.B.doc;
+  if (!A) return;
+  const mine = LIST.filter((s) => s.household === HOUSE.id);
+  const options = (slot) => {
+    const other = slot === "A" ? B && B.id : A.id, cur = SLOTS[slot].doc && SLOTS[slot].doc.id;
+    const list = mine.map((s) => ({ value: s.id, label: s.name + (s.id === other && s.id !== cur ? " (shown in " + (slot === "A" ? "blue" : "pink") + ")" : ""), disabled: s.id === other && s.id !== cur }));
+    return slot === "B" ? [{ value: "", label: B ? "None" : "Compare with…" }].concat(list) : list;
+  };
+  const busy = slots().filter((s) => SLOTS[s].busy), bad = slots().filter((s) => SLOTS[s].error);
+  let status;
+  if (bad.length) status = `<span class="status bad" title="${esc(SLOTS[bad[0]].error)}">Owl could not solve ${bad.map(nameOf).join(" and ")}. Hover for the reason.</span>`;
+  else if (UI.editing && slots().some((s) => SLOTS[s].dirty)) status = `<span class="status">Saved · solves when you press Done</span>`;
+  else if (busy.length) status = `<span class="status">${busy.map((s) => SLOTS[s].busy + " " + nameOf(s)).join(" · ")}…</span>`;
+  else {
+    const secs = slots().map((s) => SLOTS[s].seconds).filter((v) => v != null);
+    status = `<span class="status ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5l2.5 2.5L10 3.5" fill="none" stroke="#7fc8a4" stroke-width="1.6"/></svg>Saved and solved${secs.length ? " · " + Math.max(...secs) + " s" : ""}</span>`;
+  }
+  document.getElementById("bar").innerHTML = `
+    <div class="brand"><b>Perch</b>${houseMenu()}</div>
+    <nav aria-label="Views">${[["compare", "View"], ["risk", "Risk Analysis"]].map(([v, label]) => `<button type="button" class="${UI.page === v && !UI.editing ? "on" : ""}" data-act="page" data-v="${v}" ${UI.page === v && !UI.editing ? 'aria-current="page"' : ""}>${label}</button>`).join("")}</nav>
+    <div class="picks">
+      ${UI.page === "risk"
+        ? `<div class="pick one">${dropdown({ attrs: 'data-risk-pick="1"', value: A.id, options: mine.map((s) => ({ value: s.id, label: s.name })), label: "Scenario" })}</div>`
+        : `<div class="pick A">${dropdown({ attrs: 'data-pick="A"', value: A.id, options: options("A"), label: B ? "Pink scenario" : "Scenario" })}</div>
+      ${B ? '<span class="muted">vs</span>' : ""}
+      <div class="pick B ${B ? "" : "none"}">${dropdown({ attrs: 'data-pick="B"', value: B ? B.id : "", options: options("B"), label: "Compare with" })}</div>`}
+      ${UI.editing ? `<button type="button" class="solid primary" data-act="done">Done · solve</button>` : `<button type="button" class="solid" data-act="edit">Edit inputs</button>`}
+      ${status}
+    </div>`;
+}
+
+// ---------- timeline ----------
+function seg(list, key) {
+  return `<div class="seg" role="group">${list.map(([v, label]) => `<button type="button" class="${UI[key] === v ? "on" : ""}" data-act="ui" data-k="${key}" data-v="${v}">${label}</button>`).join("")}</div>`;
+}
+
+function renderTimeline() {
+  const A = rowsOf(SLOTS.A.doc), B = rowsOf(SLOTS.B.doc);
+  if (!A.length && !B.length) return `<section class="panel timeline" aria-label="Timeline"><div class="empty">Owl is solving…</div></section>`;
+  // Difference needs two plans.
+  if (!two() && UI.mode === "diff") UI.mode = "side";
+  const years = [...new Set(A.concat(B).map((r) => r.year))].sort((x, y) => x - y);
+  const first = years[0], last = years[years.length - 1];
+  if (UI.year == null || UI.year < first || UI.year > last) UI.year = Math.min(first + 4, last);
+  const R = [first, last], span = Math.max(1, R[1] - R[0]);
+  const inR = (r) => r.year >= R[0] && r.year <= R[1];
+  const a = A.filter(inR), b = B.filter(inR), year = Math.min(Math.max(UI.year, R[0]), R[1]);
+  UI.year = year;
+
+  const all = [];
+  milestones(SLOTS.A.doc).forEach((m) => all.push({ year: m.year, label: m.label, who: "A" }));
+  milestones(SLOTS.B.doc).forEach((m) => { const hit = all.find((o) => o.year === m.year && o.label === m.label); if (hit) hit.who = "both"; else all.push({ year: m.year, label: m.label, who: "B" }); });
+  all.sort((x, y) => x.year - y.year);
+  const markFill = { A: COLOR.A, B: COLOR.B, both: "#c3c2b7" };
+
+  function frame(W, H, ymin, ymax) {
+    const L = 58, Rp = 10, T = 8, Bp = 34, pw = W - L - Rp, ph = H - T - Bp;
+    const x = (yr) => L + (yr - R[0]) * pw / span, y = (v) => T + ph * (ymax - v) / (ymax - ymin || 1);
+    const step = niceStep(ymax - ymin); let grid = "";
+    for (let v = Math.ceil(ymin / step) * step; v <= ymax + 1e-6; v += step) {
+      grid += `<line x1="${L}" x2="${W - Rp}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${Math.abs(v) < 1e-6 ? "#5a5c62" : "#2a2c31"}"/><text x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${Math.abs(v) < 1e-6 ? "$0" : money(v)}</text>`;
+    }
+    const every = span > 30 ? 5 : span > 16 ? 2 : 1; let xt = "";
+    for (let yr = R[0]; yr <= R[1]; yr++) if (yr % every === 0) xt += `<text x="${x(yr).toFixed(1)}" y="${H - 4}" text-anchor="middle">${yr}</text>`;
+    const cw = pw / span; let cols = "";
+    for (let yr = R[0]; yr <= R[1]; yr++) cols += `<rect x="${(x(yr) - cw / 2).toFixed(1)}" y="${T}" width="${cw.toFixed(1)}" height="${ph + 20}" fill="transparent" data-year="${yr}"/>`;
+    const cross = `<line x1="${x(year).toFixed(1)}" x2="${x(year).toFixed(1)}" y1="${T}" y2="${T + ph + 16}" stroke="#f0efec"/>`;
+    return { W, H, T, ph, pw, x, y, grid, xt, cols, cross };
+  }
+  function marks(f, who) {
+    const byYear = {};
+    all.filter((m) => m.year >= R[0] && m.year <= R[1] && (who === "all" || m.who === "both" || m.who === who)).forEach((m) => { (byYear[m.year] = byYear[m.year] || []).push(m); });
+    return Object.keys(byYear).map((yk) => {
+      const ms = byYear[yk], x = f.x(+yk), y0 = f.T + f.ph + 4, w = ms.length > 1 || ms[0].who === "both" ? "both" : ms[0].who;
+      return `<path d="M${x.toFixed(1)},${y0}l5,9h-10z" fill="${markFill[w]}"><title>${esc(yk + ": " + ms.map((m) => m.label).join("; "))}</title></path>`;
+    }).join("");
+  }
+  const svg = (f, inner, label) => `<svg class="chart" viewBox="0 0 ${f.W} ${f.H}" role="img" aria-label="${esc(label)}">${f.grid}${inner}${f.xt}${f.cross}${f.cols}</svg>`;
+
+  let charts = "";
+  const LAYERS = UI.stack === "spend" ? SPEND : STACK;
+  if (UI.view === "chart" && UI.mode === "side") {
+    let ymax = 1; a.concat(b).forEach((r) => { ymax = Math.max(ymax, LAYERS.reduce((t, [k]) => t + r[k], 0)); });
+    ymax = Math.ceil(ymax / niceStep(ymax)) * niceStep(ymax);
+    const stack = (rows, slot) => {
+      const doc = SLOTS[slot].doc, f = frame(980, two() ? 214 : 440, 0, ymax);
+      if (!rows.length) return `<div class="empty">Solving ${slot}…</div>`;
+      let base = rows.map(() => 0), areas = "";
+      LAYERS.forEach(([key, , fill]) => {
+        const topv = rows.map((r, i) => base[i] + r[key]);
+        let d = "M" + rows.map((r, i) => f.x(r.year).toFixed(1) + "," + f.y(topv[i]).toFixed(1)).join("L");
+        d += "L" + rows.map((r, i) => f.x(r.year).toFixed(1) + "," + f.y(base[i]).toFixed(1)).reverse().join("L") + "Z";
+        areas += `<path d="${d}" fill="${fill}" stroke="#17181b" stroke-width="1.5"/>`;
+        base = topv;
+      });
+      const sel = rows.find((r) => r.year === year) || rows[0];
+      return `<div class="${doc.stale ? "stale" : ""}"><div class="chart-head"><span>${nameOf(slot)}</span><span class="mono">${sel.year} · ${UI.stack === "spend" ? money(sel.outflow) + " spent" : money(sel.worth) + " net worth"}</span></div>${svg(f, areas + marks(f, slot), slot + " · " + doc.name)}</div>`;
+    };
+    charts = stack(a, "A") + (two() ? stack(b, "B") : "");
+  } else if (UI.view === "chart") {
+    const M = [METRICS[UI.metric][1], UI.metric];
+    if (UI.mode === "overlay") {
+      let mx = 1; a.concat(b).forEach((r) => { mx = Math.max(mx, r[M[1]]); }); mx = Math.ceil(mx / niceStep(mx)) * niceStep(mx);
+      const f = frame(980, 440, 0, mx);
+      const line = (rows, color) => rows.length ? `<path d="M${rows.map((r) => f.x(r.year).toFixed(1) + "," + f.y(r[M[1]]).toFixed(1)).join("L")}" fill="none" stroke="${color}" stroke-width="2"/>` : "";
+      const ra = a.find((r) => r.year === year), rb = b.find((r) => r.year === year);
+      charts = `<div class="chart-head"><span>${M[0]} · ${nameOf("A")}${two() ? " vs " + nameOf("B") : ""}</span><span class="mono">${year} · <span class="tA">${money(ra && ra[M[1]])}</span>${two() ? ` · <span class="tB">${money(rb && rb[M[1]])}</span>` : ""}</span></div>${svg(f, line(a, COLOR.A) + line(b, COLOR.B) + marks(f, "all"), M[0])}`;
+    } else {
+      const bm = {}; b.forEach((r) => { bm[r.year] = r; });
+      // Owl's answers wobble by a few dollars; differences under $500 count as none.
+      const ds = a.filter((r) => bm[r.year]).map((r) => { const v = bm[r.year][M[1]] - r[M[1]]; return { year: r.year, v: Math.abs(v) < 500 ? 0 : v }; });
+      let lo = 0, hi = 0; ds.forEach((d) => { lo = Math.min(lo, d.v); hi = Math.max(hi, d.v); });
+      const st = niceStep(Math.max(hi - lo, 10000)); lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st) * st; if (hi === lo) hi = lo + st;
+      const g = frame(980, 440, lo, hi), bw = Math.max(2, g.pw / span - 3);
+      const bars = ds.filter((d) => d.v).map((d) => { const y0 = g.y(0), y1 = g.y(d.v); return `<rect x="${(g.x(d.year) - bw / 2).toFixed(1)}" y="${Math.min(y0, y1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(y1 - y0)).toFixed(1)}" rx="2" fill="${d.v >= 0 ? COLOR.B : COLOR.A}"/>`; }).join("");
+      const sel = ds.find((d) => d.year === year);
+      charts = `<div class="chart-head"><span>Difference in ${M[0].toLowerCase()} · the bar's color shows which is higher: ${nameOf("B")} up, ${nameOf("A")} down</span><span class="mono">${year} · ${sel && Math.abs(sel.v) >= 500 ? `<span class="t${sel.v > 0 ? "B" : "A"}">${money(Math.abs(sel.v))} higher</span>` : "same"}</span></div>${ds.some((d) => d.v) ? "" : `<div class="muted small">No difference in any year.</div>`}${svg(g, bars + marks(g, "all"), "Difference in " + M[0])}`;
+    }
+  } else {
+    const bm = {}; B.forEach((r) => { bm[r.year] = r; });
+    const am = {}; A.forEach((r) => { am[r.year] = r; });
+    // Two tables share one set of column widths: the header sticks to the top of the page and
+    // follows the body's sideways scroll, so the page itself is the only vertical scroll.
+    const cols = [56, 92]; TABLE_GROUPS.forEach(() => cols.push(...(two() ? [88, 88] : [96])));
+    const width = cols.reduce((t, w) => t + w, 0);
+    const colgroup = `<colgroup>${cols.map((w) => `<col style="width:${w}px">`).join("")}</colgroup>`;
+    const head = `<tr><th class="l stick">Year</th><th class="l stick2">Ages</th>${TABLE_GROUPS.map(([label]) => `<th class="group sep" colspan="${two() ? 2 : 1}">${label}</th>`).join("")}</tr>`;
+    const body = years.map((y) => {
+      const r = am[y] || {}, q = bm[y] || {};
+      const cells = TABLE_GROUPS.map(([, key]) => two() ? `<td class="tA">${money(r[key])}</td><td class="tB sep">${money(q[key])}</td>` : `<td class="tA sep">${money(r[key])}</td>`).join("");
+      return `<tr class="row ${y === year ? "on" : ""}" data-year="${y}"><td class="l stick">${y}</td><td class="l stick2 muted">${people().map((p) => y - p.born).join(" / ")}</td>${cells}</tr>`;
+    }).join("");
+    charts = `<div class="years"><div class="years-head"><table style="width:${width}px">${colgroup}<thead>${head}</thead></table></div>
+      <div class="years-body" data-sync="years"><table style="width:${width}px">${colgroup}<tbody>${body}</tbody></table></div></div>`;
+  }
+
+  const legend = (UI.view === "chart" && UI.mode === "side" ? LAYERS.map(([, label, fill]) => `<span><span class="chip" style="background:${fill}"></span>${label}</span>`).join("") : "")
+    + (UI.view === "chart" ? `<span><svg width="10" height="8" viewBox="0 0 10 8" aria-hidden="true"><path d="M5 0L10 8H0Z" fill="#c3c2b7"/></svg>Milestone</span>` : "")
+    + `<span class="muted">Today's dollars</span>`;
+
+  return `<section class="panel timeline" aria-label="Timeline">
+    <div class="tools">
+      ${seg([["chart", "Chart"], ["table", "Table"]], "view")}
+      ${UI.view === "chart" ? seg(two() ? [["side", "Side by side"], ["overlay", "Overlay"], ["diff", "Difference"]] : [["side", "Stacked"], ["overlay", "One measure"]], "mode") : ""}
+      ${UI.view === "chart" && UI.mode === "side" ? seg([["worth", "Savings"], ["spend", "Spending"]], "stack") : ""}
+      ${UI.view === "chart" && UI.mode !== "side" ? seg(Object.keys(METRICS).map((k) => [k, METRICS[k][0]]), "metric") : ""}
+      <div class="legend">${legend}</div>
+    </div>
+    <div class="split"><div class="charts">${charts}</div>${renderAside(A, B, all, first, last)}</div>
+  </section>`;
+}
+
+function renderAside(A, B, all, first, last) {
+  const year = UI.year, ra = A.find((r) => r.year === year), rb = B.find((r) => r.year === year);
+  const get = (r, k) => !r ? null : r[k];
+  // Spending by category, without the mortgage payment. A category shows in every year once
+  // either plan has it in any year, so the card keeps its height from year to year.
+  const used = (k) => A.concat(B).some((r) => Math.abs(r[k]) >= 1);
+  const spend = [["Base", "base"], ["Health insurance", "insurance"], ["Medicare", "medicare"], ["Health costs", "medical"], ["College", "college"], ["Gifts", "gifts"], ["Other bands", "other"]]
+    .filter(([, k]) => k === "base" || used(k)).map(([label, k]) => [label, k, 1]);
+  const defs = [["Net worth", "worth", 0], ["Taxable", "taxable", 1], ["Pre-tax", "pretax", 1], ["Roth", "roth", 1], ["Real estate", "re", 1], ["Mortgages", "debt", 1],
+    ["Spending, before mortgage", "living", 0], ...spend, ["Tax paid", "tax", 0], ["Top bracket", "bracket", 1], ["Roth conversion", "conv", 0], ["Social Security", "ss", 0]];
+  const rows = defs.map(([label, key, sub]) => {
+    const va = get(ra, key), vb = get(rb, key);
+    const pct = (v) => (v == null ? "—" : v + "%"), show = key === "bracket" ? pct : money;
+    return `<tr><th class="l ${sub ? "sub" : key === "bracket" ? "sub" : "top"}">${label}</th><td class="tA">${show(va)}</td>${two() ? `<td class="tB">${show(vb)}</td>` : ""}</tr>`;
+  }).join("");
+  const events = all.filter((m) => m.year === year);
+  // Room for the busiest year's milestones, so stepping through years doesn't move the page.
+  const room = Math.max(1, ...Object.values(all.reduce((c, m) => (c[m.year] = (c[m.year] || 0) + 1, c), {})));
+  const pad = '<div aria-hidden="true">&nbsp;</div>'.repeat(room - Math.max(1, events.length));
+  return `<aside aria-label="Year detail">
+    <div class="yearnav">
+      <button type="button" aria-label="Previous year" data-act="year" data-v="${Math.max(first, year - 1)}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" fill="none" stroke="#f0efec" stroke-width="1.6"/></svg></button>
+      <div class="big">${year}</div>
+      <button type="button" aria-label="Next year" data-act="year" data-v="${Math.min(last, year + 1)}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" fill="none" stroke="#f0efec" stroke-width="1.6"/></svg></button>
+      <span class="small" style="color:var(--soft);margin-left:6px">${people().map((p) => esc(p.name) + " " + (year - p.born)).join(" · ")}</span>
+    </div>
+    <button type="button" class="todo-open" data-act="yearModal" data-v="${year}">What to do in ${year}</button>
+    <table class="detail"><tbody>${rows}</tbody></table>
+    <div class="events">${events.length ? events.map((m) => `<div><span class="dots" title="${m.who === "both" ? "Both" : esc(SLOTS[m.who].doc.name)}">${(m.who === "both" ? ["A", "B"] : [m.who]).map((w) => `<i class="dot ${w}"></i>`).join("")}</span><span>${esc(m.label)}</span></div>`).join("") : '<div class="muted">No milestones this year.</div>'}${pad}</div>
+  </aside>`;
+}
+
+// ---------- inputs ----------
+function shown(field, v) {
+  if (v == null) return "";
+  if (field.type === "money") return dollars(v);
+  return String(v);
+}
+function inputHtml(slot, field, v, diff, path) {
+  const id = `in-${slot}-${path}`, label = esc(field.label + ", " + SLOTS[slot].doc.name);
+  if (field.type === "bool") return `<label class="boolbox ${slot} ${diff ? "diff" : ""}"><input type="checkbox" id="${id}" data-slot="${slot}" data-path="${path}" ${v ? "checked" : ""} aria-label="${label}">${v ? "Yes" : "No"}</label>`;
+  if (field.type === "select") return dropdown({ attrs: `id="${id}" data-slot="${slot}" data-path="${path}"`, value: v, cls: `field text ${slot} ${diff ? "diff" : ""}`, label: field.label + ", " + SLOTS[slot].doc.name,
+    options: field.options.map(([val, text]) => ({ value: val, label: text })) });
+  return `<input class="in ${slot} ${field.type === "text" ? "text" : ""} ${diff ? "diff" : ""}" id="${id}" data-slot="${slot}" data-path="${path}" value="${esc(shown(field, v))}" aria-label="${label}" ${field.type === "text" ? "" : 'inputmode="decimal"'}>`;
+}
+function listSummary(name, item) {
+  if (name === "properties") return [item.name, money(item.value), item.mortgage ? "mortgage " + money(item.mortgage) : "", item.sellYear ? "sold " + item.sellYear : "Keep"].filter(Boolean).join(" · ");
+  if (name === "children") return item.years > 0 ? `College ${item.collegeStart}–${item.collegeStart + item.years - 1} · ${dollars(item.cost)}/yr` : "No college";
+  return "";
+}
+function bandsSummary(doc) {
+  const bands = doc.spendingBands || [], total = bands.reduce((t, b) => t + b.amount * (b.to - b.from + 1), 0);
+  return `${bands.length} band${bands.length === 1 ? "" : "s"} · ${money(total)} over the plan`;
+}
+
+// A field with showIf only matters when the fields it names hold those values.
+// The estate-tax exemption: one per person, a couple's combined at the second death.
+function exemption() { return CONFIG.rules.estateExemptionPerPerson * Math.max(1, people().length); }
+// A section's note, with the part that only applies to a couple.
+function noteOf(sec) { return [sec.note, people().length > 1 ? sec.coupleNote : ""].filter(Boolean).join(" "); }
+// A field marked couple only matters when the household has two people.
+function applies(doc, field) { if (field.couple && people().length < 2) return false; return !field.showIf || Object.entries(field.showIf).every(([k, v]) => (doc[k] ?? false) === v); }
+
+function renderInputs() {
+  // With one plan, the second column is the same plan, hidden; nothing differs.
+  const single = UI.page === "risk" || !two();
+  const A = SLOTS.A.doc, B = SLOTS.B.doc || A, P = people();
+  const sections = CONFIG.sections.map((sec) => {
+    const rows = []; let count = 0;
+    const push = (row, diff) => { if (diff) count++; rows.push(row); };
+    if (sec.list) {
+      const spec = CONFIG.lists[sec.list], la = A[sec.list] || [], lb = B[sec.list] || [], n = Math.max(la.length, lb.length);
+      for (let i = 0; i < n; i++) {
+        const diff = JSON.stringify(la[i]) !== JSON.stringify(lb[i]), any = la[i] || lb[i];
+        const label = sec.list === "children" ? any.name + " (born " + any.born + ")" : spec.title + " " + (i + 1);
+        const cell = (slot, item) => ({ sum: item ? listSummary(sec.list, item) : "—", diff, slot, act: item ? `data-act="item" data-slot="${slot}" data-list="${sec.list}" data-i="${i}"` : "" });
+        push({ kind: "sum", label, a: cell("A", la[i]), b: cell("B", lb[i]) }, diff);
+      }
+      rows.push({ kind: "add", list: sec.list, label: spec.add });
+    }
+    {
+      (sec.fields || []).forEach((f) => {
+        if (f.list) {
+          const diff = JSON.stringify(A[f.list]) !== JSON.stringify(B[f.list]);
+          push({ kind: "sum", label: f.label, a: { sum: bandsSummary(A), diff, slot: "A", act: `data-act="bands" data-slot="A"`, verb: "Edit plan" }, b: { sum: bandsSummary(B), diff, slot: "B", act: `data-act="bands" data-slot="B"`, verb: "Edit plan" } }, diff);
+          return;
+        }
+        const useA = applies(A, f), useB = applies(B, f);
+        if (!useA && !useB) return;
+        const unused = '<span class="muted small">Not used</span>';
+        const each = f.perPerson ? P.map((p, i) => [f.label.replace("{name}", p.name), f.key + "." + i, (A[f.key] || [])[i], (B[f.key] || [])[i]]) : [[f.label, f.key, A[f.key], B[f.key]]];
+        each.forEach(([label, path, va, vb]) => { const diff = useA && useB && JSON.stringify(va) !== JSON.stringify(vb); push({ kind: "input", label, help: f.help, a: useA ? inputHtml("A", f, va, diff, path) : unused, b: !two() ? "<span></span>" : useB ? inputHtml("B", f, vb, diff, path) : unused }, diff); });
+      });
+    }
+    return { sec, rows, count };
+  }).filter((x) => !UI.diffOnly || x.count);
+
+  return `<section class="panel ${single ? "single" : ""}" aria-label="Inputs">
+    <div class="inputs-head"><b>Inputs</b><span class="muted small">Facts are what is true today. Choices are yours to make. Changes save as you go; press Done to solve.</span>
+      <label><input type="checkbox" data-act="diffOnly" ${UI.diffOnly ? "checked" : ""} style="width:16px;height:16px;accent-color:var(--soft)">Only sections that differ</label></div>
+    <div class="grid3 clones"><span></span>${slots().map((s) => `<div class="clone-row"><button type="button" class="clone ${s}" data-act="cloneAsk" data-slot="${s}">Clone ${esc(SLOTS[s].doc.name)}…</button><a class="export" href="/api/scenarios/${esc(SLOTS[s].doc.id)}/export" download title="A zip with the case and workbook Owl's own app opens">Export to Owl</a></div>`).join("")}</div>
+    ${sections.map(({ sec, rows, count }) => {
+      const open = !!UI.open[sec.name], color = KIND_COLOR[sec.kind] || "#c3c2b7";
+      return `<div class="section">
+        <button type="button" data-act="toggle" data-v="${esc(sec.name)}" aria-expanded="${open}">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="transform:rotate(${open ? 90 : 0}deg)"><path d="M3 1.5L6.5 5 3 8.5" fill="none" stroke="#c3c2b7" stroke-width="1.5"/></svg>
+          <span class="name">${esc(sec.name)}</span><span class="kind" style="color:${color};border-color:${color}">${esc(sec.kind)}</span>
+          ${count ? '<span class="differs" aria-label="Differs between the two scenarios"></span>' : ""}
+          <span class="sum">${count ? count + " differ" : "Same in both"}</span>
+        </button>
+        ${open ? `<div class="body">${rows.map((r) => {
+          if (r.kind === "add") return `<div class="grid3"><span></span>${slots().map((s) => `<button type="button" class="dashed" style="justify-self:start" data-act="add" data-slot="${s}" data-list="${r.list}">${esc(r.label)}</button>`).join("")}</div>`;
+          if (r.kind === "sum") return `<div class="grid3"><span class="field-label">${esc(r.label)}</span>${[r.a, two() ? r.b : null].map((c) => !c ? "<span></span>" : `<div class="summary"><span class="t${c.slot} ${c.diff ? "diff" : ""}">${esc(c.sum)}</span>${c.act ? `<button type="button" class="solid" ${c.act}>${c.verb || "Edit"}</button>` : ""}</div>`).join("")}</div>`;
+          return `<div class="grid3"><span class="field-label">${esc(r.label)}${tip(r.help)}</span>${r.a}${r.b}</div>`;
+        }).join("")}${noteOf(sec) ? `<div class="note">${esc(noteOf(sec))}</div>` : ""}</div>` : ""}
+      </div>`;
+    }).join("")}
+  </section>`;
+}
+
+// ---------- outcome ----------
+function renderOutcome() {
+  const docs = [SLOTS.A.doc, SLOTS.B.doc], rules = CONFIG.rules;
+  const calc = (doc) => {
+    const rows = rowsOf(doc); if (!rows.length) return null;
+    const e = rows[rows.length - 1], sum = (k) => rows.reduce((t, r) => t + r[k], 0);
+    const college = (doc.children || []).reduce((t, c) => t + c.cost * c.years, 0);
+    const gifts = (doc.spendingBands || []).filter((b) => b.kind === "gift").reduce((t, b) => t + b.amount * (b.to - b.from + 1), 0);
+    const estateTax = Math.max(0, e.worth - exemption()) * rules.estateRate, heirs = e.pretax * (doc.heirsRate || 0) / 100;
+    return { tax: sum("tax"), fed: sum("fed"), gains: sum("gains"), niit: sum("niit"), state: sum("state"), ss: sum("ss"), conv: sum("conv"),
+      college, gifts, estate: e.worth, estateTax: -estateTax, heirsTax: -heirs, net: college + gifts + e.worth - estateTax - heirs };
+  };
+  const [oa, ob] = docs.map((d) => d && calc(d));
+  if (!oa || (two() && !ob)) return `<section class="panel outcome" aria-label="Outcome over the whole plan"><b>Outcome over the whole plan</b><div class="empty">Waiting for Owl…</div></section>`;
+  const OUT = [["Taxes paid", "tax", 0, 1], ["Federal income tax", "fed", 1], ["Capital gains tax", "gains", 1], ["Investment income tax", "niit", 1], ["State tax", "state", 1],
+    ["Social Security received", "ss", 0], ["Converted to Roth", "conv", 0],
+    ["To the children", "net", 0, 1], ["College", "college", 1], ["Gifts while alive", "gifts", 1], ["Estate at the end", "estate", 1], ["Estate tax", "estateTax", 1], ["Income tax they owe on inherited pre-tax", "heirsTax", 1]];
+  return `<section class="panel outcome" aria-label="Outcome over the whole plan">
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><b>Outcome over the whole plan</b><span class="muted small">Today's dollars, added up over every year</span></div>
+    <div style="overflow-x:auto"><table><tbody>
+      ${OUT.map(([label, key, sub, head]) => `<tr class="${head ? "head" : ""}"><th class="l ${sub ? "sub" : ""}">${label}</th><td class="tA">${money(oa[key])}</td>${ob ? `<td class="tB">${money(ob[key])}</td>` : ""}</tr>`).join("")}
+    </tbody></table></div>
+    <div class="muted small">Estate tax: ${Math.round(rules.estateRate * 100)}% above ${money(exemption())}${people().length > 1 ? " for a couple" : ""}. Gifts and college are counted as paid, not grown. Real estate counts at today's value.</div>
+  </section>`;
+}
+
+// ---------- the year's to-do list ----------
+// What each person does in one year of one plan, from Owl's solution. Amounts come in today's
+// dollars; `price` turns them into that year's own dollars, which is what a transfer will say.
+function todoOf(slot, year) {
+  const doc = SLOTS[slot].doc, t = doc && doc.result && doc.result.timeline;
+  const r = t && t.find((x) => x.year === year);
+  if (!r) return null;
+  const prev = t.find((x) => x.year === year - 1);
+  const k = UI.dollars === "then" ? (r.price || 1) : 1;
+  const $ = (v) => { const x = v * k, step = Math.abs(x) < 10000 ? 10 : 100; return dollars(Math.round(x / step) * step); };
+  const steps = [];
+  const add = (who, text, note) => steps.push({ who, text, note });
+  (r.people || []).forEach((p, i) => {
+    const name = (people()[i] || {}).name || "Person " + (i + 1), age = year - ((people()[i] || {}).born || 0);
+    const was = prev && prev.people ? prev.people[i] : null;
+    if (p.wages > 0) {
+      add(name, `Work. Taxable pay about ${$(p.wages)}.`);
+      if (p.save[1] > 0) add(name, `Pre-tax 401k: ${$(p.save[1])} goes in, your paycheck savings plus the employer match.`);
+      if (p.save[2] > 0) add(name, `Roth 401k: put in ${$(p.save[2])}, including after-tax money moved to Roth inside the plan.`);
+      if (p.save[3] > 0) add(name, `HSA: put in ${$(p.save[3])}.`);
+      if (p.save[0] > 0) add(name, `Taxable account: put in ${$(p.save[0])}.`);
+    }
+    if (p.ss > 0 && !(was && was.ss > 0)) add(name, `Start Social Security this year, at ${age}. About ${$(p.ss)} this year.`, "Apply about three months ahead.");
+    else if (p.ss > 0) add(name, `Social Security pays about ${$(p.ss)}.`);
+    if (p.convert > 0) add(name, `Roth conversion: move ${$(p.convert)} from pre-tax to Roth.`, "It counts as income this year. Do it by 31 December.");
+    if (p.required > 0) add(name, `Required withdrawal: take at least ${$(p.required)} out of pre-tax.`, "Required by law from this age. Due by 31 December.");
+    const extra = p.pretaxOut - p.required;
+    if (extra > 50) add(name, `${p.required > 0 ? "On top of that, take" : "Take"} ${$(extra)} out of pre-tax.`, "Taxed as income.");
+    const net = p.sell - p.invest;
+    if (net > 50) add(name, `Sell ${$(net)} from the taxable brokerage account.`, p.gain != null && p.sell > 0 ? `About ${$(p.gain * net / p.sell)} of it is gain, taxed as capital gains.` : "");
+    else if (net < -50) add(name, `Invest ${$(-net)} of leftover cash in the taxable account.`);
+    if (p.rothOut > 50) add(name, `Take ${$(p.rothOut)} out of Roth. Tax-free.`);
+    if (p.hsaOut > 50) add(name, `Pay ${$(p.hsaOut)} of medical costs from the HSA. Tax-free.`);
+  });
+  if (r.insurance > 0) add("Both", `Marketplace health insurance: about ${$(r.insurance)} for the year, after any subsidy.`, "Sign up in open enrollment, each November, for the next year.");
+  if (r.medicare > 0) add("Both", `Medicare premiums: about ${$(r.medicare)}.`, "Higher income two years earlier raises them.");
+  const bands = extrasOf(doc, year).map((x) => `${x.what} ${$(x.amount)}`);
+  add("Both", `Spend about ${$(r.spending)} on living${bands.length ? ", plus " + bands.join(", ") : ""}.`);
+  if (r.tax > 0) {
+    const parts = [["federal income", r.federal], ["capital gains", r.gainsTax], ["investment income", r.niit], [(HOUSE && HOUSE.state ? HOUSE.state + " " : "state ") + "income", r.state]].filter(([, v]) => v > 50);
+    add("Both", `Tax for ${year}: about ${$(r.tax)}, of which ${parts.map(([w, v]) => w + " " + $(v)).join(", ")}.`, "Pay it in quarterly estimates (April, June, September, January), or have it withheld.");
+  }
+  return { steps, row: r };
+}
+
+function yearBody(year) {
+  const col = (slot) => {
+    const todo = todoOf(slot, year);
+    if (!todo) return `<div class="todo"><div class="todo-head">${nameOf(slot)}</div><div class="muted small">No plan for this year.</div></div>`;
+    const groups = [];
+    todo.steps.forEach((x) => { let g = groups.find((y) => y.who === x.who); if (!g) groups.push(g = { who: x.who, list: [] }); g.list.push(x); });
+    return `<div class="todo" style="border-top-color:${COLOR[slot]}"><div class="todo-head">${nameOf(slot)}</div>${groups.map((g) => `<div class="todo-who">${esc(g.who === "Both" ? (people().length > 1 ? "Together" : "Household") : g.who)}</div><ol>${g.list.map((x) => `<li>${esc(x.text)}${x.note ? `<div class="muted small">${esc(x.note)}</div>` : ""}</li>`).join("")}</ol>`).join("")}</div>`;
+  };
+  const r = (todoOf("A", year) || todoOf("B", year) || {}).row || {};
+  const ages = people().map((p) => p.name + " " + (year - p.born)).join(" · ");
+  return `<div class="pad">
+      <div class="todo-bar">${seg([["today", "Today's dollars"], ["then", year + " dollars"]], "dollars")}<span class="muted small">${UI.dollars === "then" ? `Prices assumed ${((r.price || 1) - 1) * 100 >= 0.5 ? Math.round(((r.price || 1) - 1) * 100) + "% higher than in " + (SLOTS.A.doc || SLOTS.B.doc).planStart : "about the same as today"}. These are the amounts a transfer would show.` : "Prices of 1 January " + (SLOTS.A.doc || SLOTS.B.doc).planStart + ", like the rest of the page."} ${esc(ages)}.</span></div>
+      <div class="todo-cols ${two() ? "" : "one"}">${slots().map(col).join("")}</div>
+      <p class="muted small">From Owl's solution, rounded. A plan, not advice: check the tax and account steps with your adviser before acting.</p></div>`;
+}
+
+// ---------- modals ----------
+function renderModal() {
+  ddClose();
+  const box = document.getElementById("modal"), md = UI.modal;
+  if (!md) { box.innerHTML = ""; return; }
+  const head = (slot, title, sub) => `<div class="dialog-head">${slot ? `<span class="chip" style="background:${COLOR[slot]}"></span>` : ""}<div class="title">${esc(title)}</div><div class="muted small">${esc(sub)}</div><button type="button" class="close" aria-label="Close" data-act="close">${CLOSE}</button></div>`;
+  let html = "";
+  if (md.kind === "house") {
+    const fresh = md.mode === "new", n = md.people.length;
+    const row = (p, i) => `<div class="person"><label>Name<input class="in text" id="hh-name-${i}" value="${esc(p.name)}" autocomplete="off"></label>
+      <label>Born<input class="in" id="hh-born-${i}" value="${esc(p.born)}" inputmode="numeric" placeholder="for example 1970"></label>
+      <label>Sex, for life expectancy${dropdown({ attrs: `id="hh-sex-${i}"`, value: p.sex, cls: "field text", label: "Sex", options: [{ value: "F", label: "Female" }, { value: "M", label: "Male" }] })}</label></div>`;
+    html = `<div class="dialog" style="max-width:680px">${head("", fresh ? "New household" : "Edit household", fresh ? "Its scenarios are kept together in their own folder. It starts with one scenario, with your facts empty." : "Shared by every scenario of " + HOUSE.name + ".")}
+      <div class="pad form">
+        <label>People${fresh ? dropdown({ attrs: 'id="hh-count" data-act="houseCount"', value: String(n), cls: "field text", label: "People", options: [{ value: "1", label: "One person" }, { value: "2", label: "A couple" }] }) : `<span class="fixed">${n > 1 ? "A couple" : "One person"}</span>`}</label>
+        <label>State, for state income tax${dropdown({ attrs: 'id="hh-state"', value: md.state, cls: "field text", label: "State", options: CONFIG.states.map(([value, label]) => ({ value, label })) })}</label>
+        ${md.people.map(row).join("")}</div>
+      <div class="foot"><button type="button" class="solid primary" data-act="saveHouse">${fresh ? "Create" : "Save"}</button><button type="button" data-act="close">Cancel</button><span class="muted small" id="hh-error">${fresh ? "" : "Saving solves every scenario of this household again."}</span></div></div>`;
+  } else if (md.kind === "item") {
+    const doc = SLOTS[md.slot].doc, spec = CONFIG.lists[md.list], item = (doc[md.list] || [])[md.i];
+    if (!item) { UI.modal = null; box.innerHTML = ""; return; }
+    html = `<div class="dialog" style="max-width:640px">${head(md.slot, (item.name || spec.title) + " · " + doc.name, "Edits this scenario only.")}
+      <div class="pad form">${spec.fields.map((f) => `<label><span>${esc(f.label)}${tip(f.help)}</span>${inputHtml(md.slot, f, item[f.key], false, md.list + "." + md.i + "." + f.key)}</label>`).join("")}</div>
+      <div class="foot"><button type="button" class="danger" data-act="remove" data-slot="${md.slot}" data-list="${md.list}" data-i="${md.i}">${esc(spec.remove)}</button><span class="muted small">${esc((CONFIG.sections.find((s) => s.list === md.list) || {}).note || "")}</span></div></div>`;
+  } else if (md.kind === "bands") {
+    html = `<div class="dialog" style="max-width:1160px">${head(md.slot, "Spending plan · " + SLOTS[md.slot].doc.name, "Today's dollars. Edits this scenario only.")}${bandsBody(md.slot)}</div>`;
+  } else if (md.kind === "clone") {
+    const doc = SLOTS[md.slot].doc;
+    html = `<div class="dialog" style="max-width:560px">${head(md.slot, "Clone " + doc.name, "Makes a copy with the same inputs. It opens in the other column.")}
+      <div class="pad form one"><label>Name<input class="in text" id="clone-name" value="${esc(doc.name + " copy")}"></label>
+        <label>Description<textarea class="in text" id="clone-desc" rows="3">${esc(doc.description || "")}</textarea></label></div>
+      <div class="foot"><button type="button" class="solid primary" data-act="clone">Create copy</button><button type="button" data-act="close">Cancel</button></div></div>`;
+  } else if (md.kind === "year") {
+    html = `<div class="dialog" style="max-width:1040px">${head("", "What to do in " + md.year, two() ? "Both scenarios, from Owl's solution." : "From Owl's solution.")}${yearBody(md.year)}
+      <div class="foot">${[[md.year - 1, "← " + (md.year - 1)], [md.year + 1, (md.year + 1) + " →"]].map(([y, label]) => `<button type="button" data-act="yearModal" data-v="${y}" ${todoOf("A", y) || todoOf("B", y) ? "" : "disabled"}>${label}</button>`).join("")}</div></div>`;
+  } else if (md.kind === "solving") {
+    const names = (md.slots || []).map(nameOf);
+    html = `<div class="dialog solving" style="max-width:420px" aria-live="polite"><div class="spinner" aria-hidden="true"></div><div class="title">${md.slots ? (names.length ? "Owl is solving" : "Nothing changed") : "Saving"}</div><div class="small">${names.join(" and ") || "&nbsp;"}</div><div class="muted small">Usually a few seconds; letting Owl choose claiming ages or a fixed withdrawal order takes longer.</div></div>`;
+  } else if (md.kind === "failed") {
+    html = `<div class="dialog" style="max-width:560px">${head("", "Owl could not solve", "Change the inputs and press Done again.")}<div class="pad">${md.slots.map((s) => `<p><b>${nameOf(s)}</b><br><span class="muted small">${esc(SLOTS[s].error)}</span></p>`).join("")}</div><div class="foot"><button type="button" class="solid" data-act="close">Back to editing</button></div></div>`;
+  }
+  const focus = document.activeElement && document.activeElement.id;
+  box.innerHTML = `<div class="scrim" data-act="scrim" role="dialog" aria-modal="true">${html}</div>`;
+  if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
+}
+
+function bandsBody(slot) {
+  const doc = SLOTS[slot].doc, bands = doc.spendingBands || [], rows = rowsOf(doc);
+  const start = doc.planStart, last = rows.length ? rows[rows.length - 1].year : start + 50;
+  const W = 1080, L = 56, Rr = 12, T = 12, CH = 240, years = [];
+  for (let y = start; y <= last; y++) years.push(y);
+  const cw = (W - L - Rr) / years.length, bw = Math.max(2, cw - 2), baseOf = {};
+  rows.forEach((r) => { baseOf[r.year] = r.spend; });
+  const colorOf = (x) => x.kind === "mortgage" ? "#8f7fe0" : x.kind === "college" ? "#c98500" : BAND_COLORS[x.band % BAND_COLORS.length];
+  const parts = (y) => [{ what: "Base", amount: baseOf[y] != null ? baseOf[y] : doc.netSpending, color: "#5a5c62" }].concat(extrasOf(doc, y).map((x) => Object.assign(x, { color: colorOf(x) })));
+  let peak = 1; years.forEach((y) => { peak = Math.max(peak, parts(y).reduce((t, p) => t + p.amount, 0)); });
+  const stp = niceStep(peak), ymx = Math.ceil(peak / stp) * stp, yv = (v) => T + CH * (1 - v / ymx);
+  let bars = "", grid = "", xt = "", lanes = "";
+  years.forEach((y, i) => { let acc = 0; parts(y).forEach((p) => { bars += `<rect x="${(L + i * cw + 1).toFixed(1)}" y="${(yv(acc + p.amount) + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, yv(acc) - yv(acc + p.amount) - 1).toFixed(1)}" fill="${p.color}"><title>${esc(y + " · " + p.what + " · " + dollars(p.amount))}</title></rect>`; acc += p.amount; }); });
+  for (let v = 0; v <= ymx + 1; v += stp) grid += `<line x1="${L}" x2="${W - Rr}" y1="${yv(v).toFixed(1)}" y2="${yv(v).toFixed(1)}" stroke="#2a2c31"/><text x="${L - 8}" y="${(yv(v) + 4).toFixed(1)}" text-anchor="end">${v === 0 ? "$0" : money(v)}</text>`;
+  years.forEach((y, i) => { if (y % 5 === 0) xt += `<text x="${(L + i * cw + cw / 2).toFixed(1)}" y="${T + CH + 16}" text-anchor="middle">${y}</text>`; });
+  const lanesTop = T + CH + 30;
+  bands.forEach((b, i) => {
+    const x1 = L + (Math.max(b.from, start) - start) * cw, x2 = L + (Math.min(b.to, last) - start + 1) * cw, ly = lanesTop + i * 24, c = BAND_COLORS[i % BAND_COLORS.length];
+    lanes += `<text x="${L - 8}" y="${ly + 13}" text-anchor="end">${i + 1}</text><rect x="${x1.toFixed(1)}" y="${ly}" width="${Math.max(4, x2 - x1).toFixed(1)}" height="18" rx="4" fill="${c}"><title>${esc(b.name)}</title></rect>`
+      + `<rect class="handle" x="${x1.toFixed(1)}" y="${ly}" width="6" height="18" rx="2" fill="#f0efec" data-drag="from" data-i="${i}"><title>Drag to change the first year</title></rect>`
+      + `<rect class="handle" x="${(x2 - 6).toFixed(1)}" y="${ly}" width="6" height="18" rx="2" fill="#f0efec" data-drag="to" data-i="${i}"><title>Drag to change the last year</title></rect>`;
+  });
+  const legend = [["Base", "#5a5c62"], ["Mortgage", "#8f7fe0"], ["College", "#c98500"]].concat(bands.map((b, i) => [(i + 1) + " · " + b.name, BAND_COLORS[i % BAND_COLORS.length]]));
+  const spec = CONFIG.lists.spendingBands, fld = (k) => spec.fields.find((f) => f.key === k);
+  const lifetime = bands.reduce((t, b) => t + b.amount * (b.to - b.from + 1), 0);
+  return `<div class="pad" style="display:flex;flex-direction:column;gap:10px">
+      <div class="legend" style="margin-left:0">${legend.map(([l, c]) => `<span><span class="chip" style="background:${c}"></span>${esc(l)}</span>`).join("")}</div>
+      <svg class="chart" id="bands-svg" data-slot="${slot}" data-l="${L}" data-cw="${cw}" data-start="${start}" data-last="${last}" viewBox="0 0 ${W} ${lanesTop + bands.length * 24 + 6}" role="img" aria-label="Spending per year by kind" style="touch-action:none">${grid}${bars}${xt}${lanes}</svg>
+      <div class="muted small">Drag a band's ends to change its years. ${people().length > 1 ? "Base is what Owl spends after the survivor adjustment." : "Base is what Owl spends each year."} Mortgage and college come from Real estate and Children. Bands that grow like health costs rise faster than prices by the Health setting.</div>
+    </div>
+    <div style="border-top:1px solid var(--line)">
+      <div class="bands-row head"><span></span><span></span><span>Band</span><span>Extra per year</span><span>From</span><span>Through</span><span>Grows like</span><span>Kind</span><span></span></div>
+      ${bands.map((b, i) => `<div class="bands-row"><span class="chip" style="width:12px;height:12px;border-radius:3px;background:${BAND_COLORS[i % BAND_COLORS.length]}"></span><span class="mono muted small">${i + 1}</span>
+        ${["name", "amount", "from", "to", "grows", "kind"].map((k) => inputHtml(slot, fld(k), b[k], false, "spendingBands." + i + "." + k)).join("")}
+        <button type="button" class="x" aria-label="Remove band ${i + 1}" data-act="remove" data-slot="${slot}" data-list="spendingBands" data-i="${i}">${CLOSE}</button></div>`).join("")}
+      <div class="foot"><button type="button" class="solid" data-act="add" data-slot="${slot}" data-list="spendingBands">Add band</button><span class="muted small">Bands add ${money(lifetime)} over the plan before extra health growth</span></div>
+    </div>`;
+}
+
+// ---------- risk ----------
+const ANALYSES = [
+  ["left", "Savings left at the end"],
+  ["spend", "Safe spending · Perch"],
+  ["owl-frontier", "Safe spending · Owl's frontier"],
+  ["regret", "January conversion · Perch quick check"],
+  ["owl-regret", "January conversion · Owl's full sweep"],
+];
+const pathAnalysis = () => UI.riskMeasure === "left" || UI.riskMeasure === "spend";
+function fmtTime(sec) {
+  if (sec < 50) return Math.max(5, Math.round(sec / 5) * 5) + " seconds";
+  const min = Math.round(sec / 60);
+  return min <= 1 ? "about a minute" : min + " minutes";
+}
+// Time on this computer, from the last runs of the same kind (or measurements made while building Perch).
+function estimate() {
+  const t = CONFIG.timings, doc = SLOTS[UI.riskSlot].doc, years = rowsOf(doc).length || 50;
+  const starts = Math.max(1, CONFIG.history[1] - CONFIG.history[0] + 2 - years);
+  let seconds, detail;
+  if (UI.riskMeasure === "owl-frontier") { seconds = t["owl-frontier"]; detail = `Owl's tool solves ${starts} histories, all of the computer's cores at once.`; }
+  else if (UI.riskMeasure === "owl-regret") { seconds = t["owl-regret"]; detail = `Owl's tool: ${starts} hindsight plans, then each history again at 19 locked amounts and once never converting, about ${starts * 21} solves on all cores.`; }
+  else if (UI.riskMeasure === "regret") { const n = starts * (CONFIG.regretGrid + 2); seconds = n * t["regret-perch"]; detail = `${starts} hindsight plans plus each history at about ${CONFIG.regretGrid + 1} locked amounts: ${n} solves, ${CONFIG.workers} at a time.`; }
+  else { const n = UI.riskKind === "history" ? starts : CONFIG.randomPaths; seconds = n * t.paths; detail = `${n} paths, one Owl solve each, ${CONFIG.workers} at a time.`; }
+  const text = fmtTime(seconds);
+  return { seconds, text, detail: `${text.startsWith("about") ? text[0].toUpperCase() + text.slice(1) : "About " + text}. ${detail}` };
+}
+function howPanel(first) {
+  const doc = SLOTS[UI.riskSlot].doc, market = (CONFIG.riskModels.find((m) => m[0] === UI.riskKind) || [])[2] || "";
+  const common = "Owl plans each history knowing its markets in advance, so it shows the best that could be done in it; real life will not time things this well. Social Security starts at the ages Owl chose for the plan.";
+  const H = {
+    left: {
+      q: "Does the money last to the end of the plan, and how much is left?",
+      how: [`Perch picks a set of market paths: ${UI.riskKind === "history" ? `every 52-year stretch of real history, starting each year from ${first} until history runs out` : "the market choice below"}.`, "Owl plans the scenario once on each path, exactly as in View, with that path's returns.", "Perch counts the paths that pay for everything, those that run short, and those Owl answers only roughly (borderline), and draws net worth over the years."],
+      see: "How many paths lasted, savings left at the median and P10, the lowest net worth, net worth by year as a band or as every path, and the picked path in full.",
+      who: "Each solve is Owl's. Choosing the paths and adding up the results is Perch's.",
+    },
+    spend: {
+      q: "How much could we spend every year and still last?",
+      how: ["Same paths as above.", "On each, Owl finds the most base spending it can pay every year (on top of the health, care, college and gift bands and the mortgage), instead of how much is left.", "Perch counts, for each spending level, how many paths can pay it."],
+      see: "The share of paths that afford each level, the level 9 in 10 afford, and what each path could pay. Works with every market choice and with drawn lifespans.",
+      who: "Each solve is Owl's. The counting is Perch's, and it is the first step of Owl's frontier below. It says how often a level fails, not by how much.",
+    },
+    "owl-frontier": {
+      q: "How much could we spend every year, how often would it fall short, and by how much?",
+      how: [`Owl's own spending optimization, run unchanged, over every start year of real history (${first} on).`, "Step one is the same as Perch's: the most each history could spend every year.", "Step two is Owl's: for each spending level it works out the chance of falling short and the average shortfall when it does, and traces the best trade-off between them (its efficient frontier)."],
+      see: "For each spending level: the chance of running short and the average shortfall. The level with a 9 in 10 chance, and where the plan's spending sits.",
+      who: "All Owl. Real history only. Faster than Perch's, since Owl runs it in one program on all cores.",
+    },
+    regret: {
+      q: "How much does this January's Roth conversion amount matter?",
+      how: ["For every start year of real history, Owl first plans with hindsight and finds that history's own best first-year conversion.", `Then each history is planned again with the January conversion locked at each of about ${CONFIG.regretGrid + 1} amounts; every later year is still free to adjust.`, "The cost of an amount is how much less is left at the end than with hindsight, and whether the money still lasts."],
+      see: "For each amount: the typical and the bad-case cost, and the histories where it runs short.",
+      who: "Each solve is Owl's. It follows Owl's own method (below) on a coarser grid, in parallel, and skips Owl's 'never convert' comparison.",
+    },
+    "owl-regret": {
+      q: "How much does this January's conversion amount matter, how much is converting at all worth, and is there one best amount?",
+      how: [`Owl's own Roth conversion regret sweep, run unchanged, over every start year of real history (${first} on).`, "Owl plans each history with hindsight, then again with January's conversion locked at 19 amounts sized to the spread it saw, and once never converting at all.", "It reports the cost of each amount, the value of converting at all, and whether a best amount stands out from the noise of its own approximations."],
+      see: "The value of converting at all, where each history's own best amount falls, the cost and shortfalls of each amount, and Owl's verdict on a best amount.",
+      who: "All Owl. Real history only. The most complete answer, and the slowest.",
+    },
+  }[UI.riskMeasure];
+  const marketLine = pathAnalysis() ? `<dt>Markets</dt><dd>${esc(market)}${UI.riskKind === "history" ? "" : ` Fitted to real history from ${first} on.`}${riskLife() ? " Each path also draws every person's age at death from US life tables, given their age today." : ""}</dd>` : "";
+  const st = RISK[riskKey()];
+  return `<details class="how" ${st && st.result ? "" : "open"}><summary>How this works</summary><dl>
+    <dt>The question</dt><dd>${esc(H.q)}</dd>
+    <dt>How</dt><dd><ol>${H.how.map((x) => `<li>${esc(x)}</li>`).join("")}</ol></dd>
+    ${marketLine}
+    <dt>What you see</dt><dd>${esc(H.see)}</dd>
+    <dt>Terms</dt><dd>P10: 1 in 10 paths is below it. Median: half above, half below. P90: 1 in 10 is above it. P10–P90 holds 80% of paths, P25–P75 half.</dd>
+    <dt>Whose method</dt><dd>${esc(H.who)}</dd>
+    <dt>Keep in mind</dt><dd>${esc(common)}</dd>
+    <dt>Time</dt><dd>${esc(estimate().detail)}</dd></dl></details>`;
+}
+
+// One plan across many markets: real history from each possible start year, or random
+// five-year blocks of it. The server runs the paths; this draws what came back.
+const RISK = {};
+const riskLife = () => UI.riskLife === "1" && UI.riskKind !== "history";
+const riskKey = () => UI.riskMeasure === "regret" ? SLOTS[UI.riskSlot].doc.id + "|regret"
+  : UI.riskMeasure.startsWith("owl-") ? SLOTS[UI.riskSlot].doc.id + "|" + UI.riskMeasure
+  : SLOTS[UI.riskSlot].doc.id + "|" + UI.riskKind + "|" + (riskLife() ? "1" : "0") + "|" + (UI.riskMeasure === "spend" ? "1" : "0");
+const riskUrl = (key) => {
+  if (key.endsWith("|regret")) return `/api/scenarios/${key.split("|")[0]}/regret`;
+  if (key.includes("|owl-")) { const [id, tool] = key.split("|"); return `/api/scenarios/${id}/owl/${tool.slice(4)}`; }
+  const [id, kind, life, spend] = key.split("|"), q = [life === "1" && "life=1", spend === "1" && "spend=1"].filter(Boolean);
+  return `/api/scenarios/${id}/risk/${kind}${q.length ? "?" + q.join("&") : ""}`;
+};
+// Each run is polled under its own key, one timer per key, until it finishes; switching away
+// and back finds it still updating.
+const POLL = {};
+async function riskLoad(key = riskKey()) {
+  clearTimeout(POLL[key]); POLL[key] = null;   // loading now: present, so a redraw does not load again
+  try { RISK[key] = (await api("GET", riskUrl(key))).data; } catch (err) { RISK[key] = { error: err.message }; }
+  // The next poll is set before drawing, so drawing does not start a second one.
+  if (riskBusy(RISK[key])) POLL[key] = setTimeout(() => riskLoad(key), 1500);
+  else delete POLL[key];
+  if (UI.page === "risk" && !UI.editing && key === riskKey()) renderRiskOnly();
+}
+const riskBusy = (st) => !!st && ((st.job && st.job.running) || (st.runoutJob && st.runoutJob.running));
+async function riskRun() {
+  UI.riskPath = null;
+  await api("POST", riskUrl(riskKey()));
+  riskLoad();
+}
+function renderRiskOnly() {
+  const main = document.getElementById("main");
+  if (DD && main && main.contains(DD.btn)) ddClose();
+  if (main && UI.page === "risk" && !UI.editing) main.innerHTML = renderRisk();
+}
+function quantile(sorted, q) {
+  if (!sorted.length) return null;
+  const at = (sorted.length - 1) * q, lo = Math.floor(at), hi = Math.ceil(at);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (at - lo);
+}
+// Log scale with 1-2-5 ticks; values below the floor sit on the floor.
+function logScale(lo, hi, top, height) {
+  const a = Math.log10(lo), b = Math.log10(hi);
+  const y = (v) => top + height * (b - Math.log10(Math.max(lo, v))) / (b - a || 1);
+  const ticks = [];
+  for (let d = Math.floor(a); d <= Math.ceil(b); d++) [1, 2, 5].forEach((m) => { const v = m * Math.pow(10, d); if (v >= lo * 0.999 && v <= hi * 1.001) ticks.push(v); });
+  return { y, ticks };
+}
+function riskStats(data) {
+  // A path Owl could only answer by falling back on an earlier, unsettled pass is borderline:
+  // the money just about lasts or runs short, and Owl could not settle which.
+  const unsettled = (p) => p.solved && p.convergence === "unsolvable iterate";
+  const paths = data.paths, ok = paths.filter((p) => p.solved && !unsettled(p)), ends = ok.map((p) => p.bequest).sort((a, b) => a - b);
+  // With drawn lifespans paths end in different years; each year counts the paths still running.
+  const years = [...new Set(ok.flatMap((p) => p.timeline.map((r) => r.year)))].sort((a, b) => a - b);
+  const bands = years.map((yr) => {
+    const v = ok.map((p) => (p.timeline.find((r) => r.year === yr) || {}).worth).filter((x) => x != null).sort((a, b) => a - b);
+    return { year: yr, n: v.length, p0: v[0], p100: v[v.length - 1], p10: quantile(v, 0.1), p25: quantile(v, 0.25), p50: quantile(v, 0.5), p75: quantile(v, 0.75), p90: quantile(v, 0.9) };
+  }).filter((b) => b.n >= Math.max(5, ok.length / 10));
+  let low = null;
+  ok.forEach((p) => p.timeline.forEach((r) => { if (!low || r.worth < low.worth) low = { worth: r.worth, year: r.year, path: p }; }));
+  return { paths, ok, ends, years, bands, low, short: paths.filter((p) => !p.solved && p.short), stuck: paths.filter((p) => !p.solved && !p.short), borderline: paths.filter(unsettled) };
+}
+function fanReadout() {
+  const st = RISK[riskKey()], data = st && st.result;
+  if (!data) return "";
+  const S = riskStats(data), b = S.bands.find((x) => x.year === UI.riskYear) || S.bands[0];
+  if (!b) return "";
+  const plan = rowsOf(SLOTS[UI.riskSlot].doc).find((r) => r.year === b.year), path = S.paths.find((p) => p.value === UI.riskPath);
+  const pr = path && ((path.solved ? path.timeline : path.runout && path.runout.timeline) || []).find((r) => r.year === b.year);
+  const ages = people().map((p) => p.name + " " + (b.year - p.born)).join(" · ");
+  return `<b>${b.year}</b> <span class="muted">${esc(ages)}</span>
+    <span title="10% of paths are below this">P10 <b class="mono">${money(b.p10)}</b></span><span title="Half the paths are above, half below">Median <b class="mono">${money(b.p50)}</b></span><span title="10% of paths are above this">P90 <b class="mono">${money(b.p90)}</b></span>
+    ${plan ? `<span>average markets <b class="mono">${money(plan.worth)}</b></span>` : ""}${pr ? `<span>this path <b class="mono">${money(pr.worth)}</b></span>` : ""}`;
+}
+// Before a run and while it runs: an empty chart of the usual size, with the button or the
+// progress in its middle, so the results take the same place when they come.
+function stage(inner) {
+  return `<div class="rwrap stage"><svg class="chart" viewBox="0 0 1200 290" aria-hidden="true"><rect x="64" y="10" width="1124" height="252" rx="6" fill="none" stroke="#2a2c31" stroke-dasharray="4 6"/></svg><div class="stage-center">${inner}</div></div>`;
+}
+// Running the same plan again gives the same answer (history is fixed, random paths have fixed
+// seeds), so Run again is offered only when the plan changed or the run predates full path data.
+const oldRun = (r) => !!(r && r.paths && r.paths.some((p) => p.solved && !p.rows));
+function renderRisk() {
+  const slot = UI.riskSlot, doc = SLOTS[slot].doc, key = riskKey(), st = RISK[key];
+  if (!(key in POLL) && (!st || riskBusy(st))) riskLoad(key);
+  const color = COLOR[slot], plan = rowsOf(doc), result = doc.result;
+  const first = CONFIG.history ? CONFIG.history[0] : 1928;
+  const nPaths = UI.riskKind === "history" ? (st && st.result && st.result.paths ? st.result.paths.length : "every") : 100;
+  const head = `<div class="tools">
+      <div class="dd-inline wide">${dropdown({ attrs: 'data-act="riskMeasure"', value: UI.riskMeasure, cls: "field text", label: "Analysis", options: ANALYSES.map(([value, label]) => ({ value, label })) })}</div>
+      ${!pathAnalysis() ? `<span class="muted small">Real history</span>` : `<div class="dd-inline">${dropdown({ attrs: 'data-act="riskKind"', value: UI.riskKind, cls: "field text", label: "Markets", options: CONFIG.riskModels.map(([value, label]) => ({ value, label })) })}</div>
+      ${UI.riskKind === "history" ? "" : seg([["0", "Live to the plan's ages"], ["1", "Lifespans from life tables"]], "riskLife")}`}
+      <span class="muted small" style="margin-left:auto">${st && st.result ? `Ran ${esc(st.result.ranAt)}${st.result.paths ? ` · ${st.result.paths.length} paths` : ""}` : ""}</span>
+      ${st && st.result && !riskBusy(st) && (st.stale || oldRun(st.result)) ? `<button type="button" data-act="riskRun">Run again · ${esc(estimate().text)}</button>` : ""}
+    </div>
+    ${howPanel(first)}`;
+  let body;
+  const job = st && st.job;
+  if (!result) body = `<div class="empty">Solve this scenario first.</div>`;
+  else if (job && job.running) {
+    const pct = job.total ? Math.round(100 * job.done / job.total) : 0;
+    const left = Math.max(0, estimate().seconds - (Date.now() / 1000 - job.began));
+    body = stage(`<div>${UI.riskMeasure.startsWith("owl-") ? `Owl is working${job.phase ? ` (${esc(job.phase === "baseline" ? "hindsight plans" : job.phase === "pinned" ? "locked amounts" : job.phase)})` : ""}: ${job.done} of ${job.total || "…"} histories.` : `${job.done} of ${job.total || "…"} paths done.`} ${job.total && job.total - job.done <= CONFIG.workers && job.done > 0 ? `Finishing the last ${job.total - job.done}: paths where the money barely lasts take longer, up to ${CONFIG.pathSolveSeconds || 20} seconds a round.` : left > 0 ? `About ${esc(fmtTime(left))} left.` : "Almost done."}</div><div class="bar-track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><div style="width:${pct}%;background:${color}"></div></div><div class="muted small">${esc(estimate().detail)}</div>`);
+  } else if (!st || !st.result) {
+    body = stage(`${job && job.error ? `<div class="status bad">${esc(job.error)}</div>` : st && st.error ? `<div class="status bad">${esc(st.error)}</div>` : ""}<button type="button" class="solid primary big-run" data-act="riskRun">Run for ${esc(SLOTS[slot].doc.name)} · ${esc(estimate().text)}</button><div class="muted small">${esc(estimate().detail)} The result is kept until the plan changes.</div>`);
+  } else body = (st.stale ? `<div class="risk-stale">This plan has changed since these paths ran. <button type="button" data-act="riskRun">Run again</button></div>` : "")
+    + (UI.riskMeasure === "owl-frontier" ? owlFrontierBody(st.result, color, doc) : UI.riskMeasure === "owl-regret" ? owlRegretBody(st.result, color) : UI.riskMeasure === "regret" ? regretBody(st.result, color) : UI.riskMeasure === "spend" ? spendBody(st.result, color, doc) : riskBody(st.result, color, plan, result, st.runoutJob));
+  return `<section class="panel risk" aria-label="Risk">${head}${body}</section>`;
+}
+// Owl's spending frontier: chance and size of a shortfall at each spending level.
+function owlFrontierBody(data, color, doc) {
+  const plan = doc.netSpending || 0;
+  const pts = (data.frontier_g_year1 || []).map((g, k) => ({ g, short: data.frontier_prob_year1[k], gap: data.frontier_shortfall_year1[k] }))
+    .filter((p) => p.g != null && p.short != null).sort((a, b) => a.g - b.g);
+  if (!pts.length) return `<div class="empty">Owl's tool returned no spending levels for this plan.</div>`;
+  const at = (g) => { let lo = pts[0]; for (const p of pts) { if (p.g <= g) lo = p; } const hi = pts.find((p) => p.g >= g) || lo; if (hi.g === lo.g) return lo; const f = (g - lo.g) / (hi.g - lo.g); return { g, short: lo.short + f * (hi.short - lo.short), gap: lo.gap + f * (hi.gap - lo.gap) }; };
+  const best = (limit) => pts.filter((p) => p.short <= limit + 1e-9).reduce((m, p) => Math.max(m, p.g), 0);
+  const here = at(plan), n = (data.start_years || []).length;
+  const tiles = [
+    ["The plan's spending", money(plan), `Chance of running short ${Math.round(here.short * 100)}%; when it does, ${money(here.gap)} a year on average`],
+    ["Works in 9 out of 10 histories", money(best(0.1)), "Owl's frontier, base spending every year"],
+    data.n_infeasible ? ["Works in every history", "none", `${data.n_infeasible} of ${n} histories cannot pay the plan's other costs (bands, mortgage, taxes) even with no base spending`]
+      : ["Works in every history", money(best(0)), `All ${n} histories`],
+    ["Middle history could spend", money(quantile((data.bases_year1 || []).filter((v) => v != null).sort((a, b) => a - b), 0.5)), "The most each history could spend, middle one"],
+  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+  const W = 1200, H = 300, L = 64, Rr = 12, T = 12, B = 30, pw = W - L - Rr, ph = H - T - B;
+  const gmax = pts[pts.length - 1].g || 1, step = niceStep(gmax), g1 = Math.ceil(gmax / step) * step;
+  const x = (g) => L + g * pw / g1, y = (f) => T + ph * (1 - f);
+  let grid = [0, 0.25, 0.5, 0.75, 0.9, 1].map((f) => `<line x1="${L}" x2="${W - Rr}" y1="${y(f).toFixed(1)}" y2="${y(f).toFixed(1)}" stroke="${f === 0.9 ? "#3a3c42" : "#2a2c31"}"/><text x="${L - 6}" y="${(y(f) + 4).toFixed(1)}" text-anchor="end">${Math.round(f * 100)}%</text>`).join("");
+  for (let g = 0; g <= g1 + 1; g += step) grid += `<text x="${x(g).toFixed(1)}" y="${H - 8}" text-anchor="${g + step > g1 + 1 ? "end" : "middle"}">${money(g)}</text>`;
+  const line = pts.map((p, k) => `${k ? "L" : "M"}${x(p.g).toFixed(1)},${y(1 - p.short).toFixed(1)}`).join("");
+  const curve = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance of lasting at each spending level">${grid}
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2"/>${pts.map((p) => `<circle cx="${x(p.g).toFixed(1)}" cy="${y(1 - p.short).toFixed(1)}" r="3" fill="${color}"><title>${money(p.g)} a year: ${Math.round((1 - p.short) * 100)}% last; shortfall ${money(p.gap)} a year on average</title></circle>`).join("")}
+    <line x1="${x(plan).toFixed(1)}" x2="${x(plan).toFixed(1)}" y1="${T}" y2="${T + ph}" stroke="#f0efec" stroke-dasharray="5 4"/>
+    <text x="${(x(plan) + 8).toFixed(1)}" y="${(T + 14).toFixed(1)}" style="fill:#f0efec">The plan: ${money(plan)}</text></svg>`;
+  // One row per spending level: Owl's frontier repeats points where the trade-off is flat.
+  const levels = pts.filter((p, k) => k === 0 || Math.round(p.g / 1000) !== Math.round(pts[k - 1].g / 1000));
+  const rows = levels.filter((p, k) => k % Math.max(1, Math.round(levels.length / 10)) === 0 || k === levels.length - 1);
+  const table = `<table class="regret"><thead><tr><th>Base spending every year</th><th>Chance of lasting</th><th>Average shortfall, when short</th></tr></thead><tbody>${rows.map((p) => `<tr><td class="mono">${money(p.g)}</td><td class="mono">${Math.round((1 - p.short) * 100)}%</td><td class="mono">${money(p.gap)}</td></tr>`).join("")}</tbody></table>`;
+  return `<div class="tiles">${tiles}</div><div class="chart-head"><span>Chance of lasting at each level of base spending (Owl's frontier)</span></div>${curve}${table}`;
+}
+
+// Owl's conversion regret sweep, as Owl summarizes it.
+function owlRegretBody(data, color) {
+  const sm = data.summary, name = data.names ? data.names[data.person] : "";
+  const xs = sm.x_star || {}, nv = sm.never_convert_regret || {}, rows = sm.regret_by_grid || [];
+  const safe = rows.filter((r) => rows.filter((o) => o.x <= r.x).every((o) => !o.n_infeasible)).map((r) => r.x);
+  const tiles = [
+    ["Value of converting at all", money(sm.value_of_converting), `Never converting leaves ${money(nv.median)} less in the typical history; ${money(nv.p90)} in a bad one`],
+    [`Best January amount for ${esc(name)}, with hindsight`, money(xs.median), `Middle history. The lowest tenth of histories are below ${money(xs.p10)}, the highest tenth above ${money(xs.p90)}`],
+    ["Safe in every history", safe.length ? "up to " + money(Math.max(...safe)) : "—", "No history runs short"],
+    ["Owl's verdict on a best amount", sm.valley_resolvable ? money(sm.valley.x) : "none stands out", sm.valley_resolvable ? `Range ${money(sm.valley_ci.p10)}–${money(sm.valley_ci.p90)}` : `Differences are smaller than the noise in Owl's own answers (${money(sm.resolution_floor)})`],
+  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+  const table = `<table class="regret"><thead><tr><th>Locked in January</th><th>Typical cost</th><th>P90 cost</th><th>Worst cost</th><th>Histories that run short</th></tr></thead><tbody>${rows.map((r) => `<tr><td class="mono">${money(r.x)}</td><td class="mono">${money(r.median)}</td><td class="mono">${money(r.p90)}</td><td class="mono">${money(r.max)}</td><td>${r.n_infeasible ? `<span class="short">${r.n_infeasible}</span>` : '<span class="muted">none</span>'}</td></tr>`).join("")}</tbody></table>`;
+  return `<div class="tiles">${tiles}</div>
+    <div class="chart-head"><span>What locking ${esc(name)}'s January conversion costs, in money left at the end (today's dollars)</span><span class="muted">${sm.n_scenarios} histories${sm.n_failed_baselines ? `; ${sm.n_failed_baselines} could not be planned` : ""}</span></div>
+    ${table}
+    <p class="risk-lead">Costs are against Owl's own hindsight plan for each history. Owl's answers are approximate, so in some histories a locked amount did slightly better than hindsight; Owl measures that noise and says when a best amount cannot be told apart from it. Owl's average cost is left out here because a few such histories swing it.</p>`;
+}
+
+// This year's conversion: what locking the first year's amount costs against hindsight.
+function regretBody(data, color) {
+  const free = {}; data.free.forEach((r) => { free[r.start] = r; });
+  const usable = data.free.filter((r) => r.solved && r.convergence !== "unsolvable iterate");
+  const rows = data.grid.map((g) => {
+    const cells = data.locked.filter((r) => r.locked === g && free[r.start] && free[r.start].solved && free[r.start].convergence !== "unsolvable iterate");
+    const short = cells.filter((r) => !r.solved).map((r) => r.start);
+    // A locked amount can end slightly better than hindsight, since Owl's answers are approximate;
+    // those are counted as they are, not rounded to zero.
+    const costs = cells.filter((r) => r.solved).map((r) => free[r.start].left - r.left).sort((a, b) => a - b);
+    return { g, short, mean: quantile(costs, 0.5) || 0, bad: quantile(costs, 0.9) || 0, worst: costs[costs.length - 1] || 0, better: costs.filter((v) => v < -1000).length };
+  });
+  const safe = rows.filter((r) => !r.short.length).map((r) => r.g), safeAll = safe.filter((g) => rows.filter((r) => r.g <= g).every((r) => !r.short.length)), safeTop = safeAll.length ? Math.max(...safeAll) : null;
+  const plan = rows.find((r) => r.g === Math.round(data.planFirst / 1000) * 1000) || rows.reduce((a, b) => (Math.abs(b.g - data.planFirst) < Math.abs(a.g - data.planFirst) ? b : a));
+  const best = usable.map((r) => r.first).sort((a, b) => a - b);
+  const tiles = [
+    [`The plan converts for ${esc(data.name)}`, money(data.planFirst), plan.short.length ? `Runs short in ${plan.short.length} of ${usable.length} histories: ${plan.short.join(", ")}` : `Lasts in all ${usable.length} histories`],
+    ["Safe in every history", safeTop == null ? "—" : "up to " + money(safeTop), "No history runs short"],
+    ["Hindsight's best, middle history", money(quantile(best, 0.5)), `Half fall between ${money(quantile(best, 0.25))} and ${money(quantile(best, 0.75))}`],
+    ["Typical cost of the plan's amount", money(plan.mean), `P90: ${money(plan.bad)}`],
+  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+  const table = `<table class="regret"><thead><tr><th>Locked in January</th><th>Typical cost</th><th>P90 cost</th><th>Worst cost</th><th>Better than hindsight</th><th>Histories that run short</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r === plan ? "on" : ""}"><td class="mono">${money(r.g)}${r === plan ? " · the plan" : ""}</td><td class="mono">${money(r.mean)}</td><td class="mono">${money(r.bad)}</td><td class="mono">${money(r.worst)}</td><td class="mono">${r.better || ""}</td><td>${r.short.length ? `<span class="short">${r.short.length}</span> <span class="muted small">${r.short.join(", ")}</span>` : '<span class="muted">none</span>'}</td></tr>`).join("")}</tbody></table>`;
+  return `<div class="tiles">${tiles}</div>
+    <div class="chart-head"><span>What locking ${esc(data.name)}'s January conversion costs, in money left at the end (today's dollars)</span><span class="muted">${usable.length} of ${data.free.length} histories; borderline and short ones left out</span></div>
+    ${table}
+    <p class="risk-lead">A history that runs short with a large January conversion is one where markets fall soon after: the conversion's tax is paid with money the plan later needs. Converting part in January and the rest late in the year, once the year's markets are known, avoids that.</p>`;
+}
+
+// The markets one path lived through: stocks each year as bars, inflation as a line, on the
+// same years as the chart above. Returns are Owl's, in percent: stocks, corporate bonds, T-notes, inflation.
+// It always takes the same space, so picking a path does not move the page.
+function returnsPanel(sel, x0, x1, L, pw) {
+  const W = 1200, H = 120;
+  const empty = (text) => `<div class="fan-read rline"><span class="muted">${text}</span></div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="No path picked"></svg>`;
+  if (!sel) return empty("Markets of the picked path: stocks each year (bars) and inflation (line).");
+  const rows = (sel.returns || []).filter((r) => r[0] >= x0 && r[0] <= x1);
+  if (!rows.length) return empty("This run is from before paths kept their markets; run it again to see each path's returns.");
+  // On real history, the plan's year and the market year it replays.
+  const first = (sel.returns || [])[0][0], when = (yr) => UI.riskKind === "history" ? `${yr} (${sel.value + yr - first}'s markets)` : String(yr);
+  const T = 14, B = 26, ph = H - T - B, Rr = 12;
+  const x = (yr) => L + (yr - x0) * pw / Math.max(1, x1 - x0), cw = pw / Math.max(1, x1 - x0);
+  const hi = Math.max(10, ...rows.map((r) => Math.max(r[1], r[4]))), lo = Math.min(-10, ...rows.map((r) => Math.min(r[1], r[4])));
+  const y = (v) => T + ph * (hi - v) / (hi - lo);
+  let svg = [lo, 0, hi].map((v) => Math.round(v)).filter((v, i, a) => a.indexOf(v) === i).map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${v === 0 ? "#5a5c62" : "#2a2c31"}"/><text x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${v}%</text>`).join("");
+  rows.forEach((r) => {
+    const top = Math.min(y(r[1]), y(0)), h = Math.max(1, Math.abs(y(r[1]) - y(0)));
+    svg += `<rect x="${(x(r[0]) - cw * 0.35).toFixed(1)}" y="${top.toFixed(1)}" width="${(cw * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${r[1] < 0 ? "#e5484d" : "#6f9fd8"}" fill-opacity="0.85"><title>${when(r[0])}: stocks ${r[1].toFixed(1)}%, bonds ${r[2].toFixed(1)}%, inflation ${r[4].toFixed(1)}%</title></rect>`;
+  });
+  svg += `<path d="${rows.map((r, k) => `${k ? "L" : "M"}${x(r[0]).toFixed(1)},${y(r[4]).toFixed(1)}`).join("")}" fill="none" stroke="#e0b04a" stroke-width="2"/>`;
+  for (let yr = x0; yr <= x1; yr++) if (yr % 5 === 0) svg += `<text x="${x(yr).toFixed(1)}" y="${H - 6}" text-anchor="middle">${yr}</text>`;
+  const avg = (k) => (Math.pow(rows.reduce((t, r) => t * (1 + r[k] / 100), 1), 1 / rows.length) - 1) * 100;
+  const worst = rows.reduce((m, r) => (r[1] < m[1] ? r : m), rows[0]), best = rows.reduce((m, r) => (r[1] > m[1] ? r : m), rows[0]);
+  const down = rows.filter((r) => r[1] < 0).length;
+  return `<div class="fan-read rline"><span class="muted">Markets: stocks (bars), inflation (line)</span><span>stocks averaged <b class="mono">${avg(1).toFixed(1)}%</b> a year</span><span>worst year <b class="mono">${worst[1].toFixed(0)}%</b> in ${when(worst[0])}</span><span>best <b class="mono">+${best[1].toFixed(0)}%</b> in ${when(best[0])}</span><span>${down} losing years of ${rows.length}</span><span>bonds averaged <b class="mono">${avg(2).toFixed(1)}%</b></span><span>inflation averaged <b class="mono">${avg(4).toFixed(1)}%</b></span></div>
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Stock returns and inflation each year on this path" data-x0="${x0}" data-x1="${x1}" data-l="${L}" data-pw="${pw}">${svg}</svg>`;
+}
+
+// A path that ran short: when the money runs out, found on request (Owl returns no plan for it).
+function runoutText(sel) {
+  const r = sel.runout;
+  if (!r) return "· the money runs out in these markets; the button on the chart finds when";
+  if (!r.lastYear) return `· the money runs out before ${r.before}, the year the first of you reaches Medicare age (Owl cannot plan for a shorter span, so Perch cannot narrow it further)`;
+  const ages = people().map((p) => `${esc(p.name)} ${r.lastYear - p.born}`).join(", ");
+  return `· the money pays for everything through <b>${r.lastYear}</b> (${ages}), then the savings run out (the home is not sold)${r.convergence === "unsolvable iterate" ? "; give or take a year, as Owl's answer near the edge is approximate" : ""}`;
+}
+
+// Safe spending: for each path, the most base spending it could pay every year.
+function spendBody(data, color, doc) {
+  const paths = data.paths, ok = paths.filter((p) => p.solved && p.spending != null);
+  const unsettled = ok.filter((p) => p.convergence === "unsolvable iterate");
+  const sp = ok.map((p) => p.spending).sort((a, b) => a - b), n = paths.length, plan = doc.netSpending || 0;
+  const affords = (g) => ok.filter((p) => p.spending >= g).length;
+  const at = (share) => { let lo = 0; for (const v of sp) if (affords(v) / n >= share) lo = v; return lo; };
+  const sel = paths.find((p) => p.value === UI.riskPath);
+  const tiles = [
+    ["The plan's spending", money(plan), `Works in ${affords(plan)} of ${n} paths`],
+    ["Works in 9 out of 10 paths", money(at(0.9)), "Base spending, every year"],
+    ["Works in every path", money(sp[0]), ok.length < n ? `of the ${ok.length} Owl could solve` : `Lowest: ${esc((ok.find((p) => p.spending === sp[0]) || {}).label || "")}`],
+    ["Median", money(quantile(sp, 0.5)), `Highest ${money(sp[sp.length - 1])}`],
+  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+
+  // Share of paths that can afford each spending level: a falling curve.
+  const W = 1200, H = 300, L = 64, Rr = 12, T = 12, B = 30, pw = W - L - Rr, ph = H - T - B;
+  const step = niceStep(sp[sp.length - 1] - Math.min(sp[0], plan) || 1);
+  const g0 = Math.floor(Math.min(sp[0], plan) * 0.9 / step) * step, g1 = Math.ceil(sp[sp.length - 1] * 1.02 / step) * step;
+  const x = (g) => L + (g - g0) * pw / Math.max(1, g1 - g0), y = (f) => T + ph * (1 - f);
+  let grid = [0, 0.25, 0.5, 0.75, 0.9, 1].map((f) => `<line x1="${L}" x2="${W - Rr}" y1="${y(f).toFixed(1)}" y2="${y(f).toFixed(1)}" stroke="${f === 0.9 ? "#3a3c42" : "#2a2c31"}"/><text x="${L - 6}" y="${(y(f) + 4).toFixed(1)}" text-anchor="end">${Math.round(f * 100)}%</text>`).join("");
+  for (let g = g0; g <= g1 + 1; g += step) grid += `<text x="${x(g).toFixed(1)}" y="${H - 8}" text-anchor="${g + step > g1 + 1 ? "end" : "middle"}">${money(g)}</text>`;
+  let d = "", prev = null;
+  for (let g = g0; g <= g1; g += Math.max(1, g1 - g0) / 300) { const f = affords(g) / n; d += `${prev == null ? "M" : "L"}${x(g).toFixed(1)},${y(f).toFixed(1)}`; prev = f; }
+  const planX = x(plan).toFixed(1), planF = affords(plan) / n;
+  const curve = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of paths that can afford each level of spending">${grid}
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>
+    <line x1="${planX}" x2="${planX}" y1="${T}" y2="${T + ph}" stroke="#f0efec" stroke-dasharray="5 4"/>
+    <circle cx="${planX}" cy="${y(planF).toFixed(1)}" r="5" fill="#f0efec"/>
+    <text x="${(+planX + 8).toFixed(1)}" y="${(y(planF) - 8).toFixed(1)}" style="fill:#f0efec">The plan: ${Math.round(planF * 100)}% of paths</text></svg>`;
+
+  // One bar per path: the most it could spend; the plan's spending as a line.
+  const BW = 1200, BH = 220, bT = 10, bB = 30, bph = BH - bT - bB, base = bT + bph;
+  const order = UI.riskKind === "history" ? paths : paths.slice().sort((a, b) => (a.spending ?? -1) - (b.spending ?? -1));
+  const top = Math.ceil(sp[sp.length - 1] * 1.05 / step) * step, by = (v) => bT + bph * (1 - v / top), slotW = pw / order.length;
+  let bars = [0, top / 4, top / 2, (3 * top) / 4, top].map((v) => `<line x1="${L}" x2="${BW - Rr}" y1="${by(v).toFixed(1)}" y2="${by(v).toFixed(1)}" stroke="#2a2c31"/><text x="${L - 6}" y="${(by(v) + 4).toFixed(1)}" text-anchor="end">${money(v)}</text>`).join("");
+  order.forEach((p, i) => {
+    const cx = L + slotW * i + slotW / 2, w = Math.max(2, slotW - 3), on = p.value === UI.riskPath;
+    const v = p.solved ? p.spending : 0, low = v < plan;
+    const fill = on ? "#6fc2b5" : !p.solved ? "#6f7278" : p.convergence === "unsolvable iterate" ? "#d9a13b" : low ? "#e5484d" : color;
+    bars += `<g data-act="riskPath" data-v="${p.value}" style="cursor:pointer"><rect x="${(cx - slotW / 2).toFixed(1)}" y="${bT}" width="${slotW.toFixed(1)}" height="${bph + 4}" fill="transparent"/>`
+      + `<rect x="${(cx - w / 2).toFixed(1)}" y="${by(Math.max(v, top * 0.02)).toFixed(1)}" width="${w.toFixed(1)}" height="${(base - by(Math.max(v, top * 0.02))).toFixed(1)}" rx="2" fill="${fill}" fill-opacity="${on ? 1 : 0.85}"/>`
+      + `<title>${esc(p.label + ": " + (p.solved ? "can spend " + money(v) + " a year" : "Owl could not solve"))}</title></g>`;
+    if (UI.riskKind === "history" && p.value % 10 === 0) bars += `<text x="${cx.toFixed(1)}" y="${BH - 8}" text-anchor="middle">${p.value}</text>`;
+  });
+  bars += `<line x1="${L}" x2="${BW - Rr}" y1="${by(plan).toFixed(1)}" y2="${by(plan).toFixed(1)}" stroke="#f0efec" stroke-dasharray="5 4"/><text x="${BW - Rr}" y="${(by(plan) - 6).toFixed(1)}" text-anchor="end" style="fill:#f0efec">The plan: ${money(plan)}</text>`;
+  const detail = sel ? `<div class="risk-path"><b style="color:#6fc2b5">${esc(sel.label)}</b>${sel.lifespans && riskLife() ? " · " + people().map((x, i) => esc(x.name) + " lives to " + sel.lifespans[i]).join(", ") : ""} · ${sel.solved ? `can pay <b class="mono">${money(sel.spending)}</b> a year${sel.spending < plan ? `, ${money(plan - sel.spending)} less than the plan` : ""}${sel.convergence === "unsolvable iterate" ? " (borderline: Owl could not fully settle this answer)" : ""}` : "Owl could not solve this path"} <button type="button" data-act="riskPath" data-v="${sel.value}">Clear</button></div>` : `<div class="risk-path muted small">Click a bar to see that path.</div>`;
+  return `<div class="tiles">${tiles}</div>
+    <div class="chart-head"><span>Share of paths that can pay each level of base spending, every year</span>${unsettled.length ? `<span class="muted">${unsettled.length} borderline</span>` : ""}</div>
+    ${curve}
+    <div class="chart-head" style="margin-top:14px"><span>The most each path can spend every year · ${UI.riskKind === "history" ? "by the year its markets start" : "lowest to highest"}</span><span class="muted">Red: less than the plan spends</span></div>
+    <svg class="chart" viewBox="0 0 ${BW} ${BH}" role="img" aria-label="The most each path can spend every year">${bars}</svg>${detail}`;
+}
+// What one path came to, in one line for the panel under the chart.
+function pathStatus(p) {
+  if (!p) return "";
+  const lives = p.lifespans && riskLife() ? " · " + people().map((x, i) => esc(x.name) + " lives to " + p.lifespans[i]).join(", ") : "";
+  if (p.solved && p.convergence === "unsolvable iterate") return `<span class="edge">Borderline</span>: the money just about lasts or runs short in these markets, and Owl could not settle which${lives}`;
+  if (p.solved) {
+    const low = p.timeline.reduce((m, r) => (r.worth < m.worth ? r : m), p.timeline[0]);
+    return `Savings left at the end <b class="mono">${money(p.bequest)}</b> · lowest net worth <b class="mono">${money(low.worth)}</b> in ${low.year} · tax over the plan <b class="mono">${money(p.timeline.reduce((t, r) => t + r.tax, 0))}</b>${lives}`;
+  }
+  if (!p.short) return "Owl could not solve this path";
+  return `<span class="short">Ran short</span> ${runoutText(p)}`;
+}
+
+// A path's years as the View tab reads a plan: Owl's full yearly numbers, with the scenario's
+// spending bands, and prices growing as that path's own inflation did.
+function pathRows(p, doc) {
+  const full = p && (p.solved ? p.rows : p.runout && p.runout.rows);
+  if (!full) return null;
+  const inf = (p.returns || []).map((r) => r[4] / 100), inflation = inf.length ? Math.pow(inf.reduce((t, v) => t * (1 + v), 1), 1 / inf.length) - 1 : undefined;
+  return rowsOf(Object.assign({}, doc, { result: { timeline: full, inflation } }));
+}
+// The year card beside the path's chart: the year under the pointer, every line always there.
+function pathCard(rows) {
+  const yr = rows ? Math.min(Math.max(UI.riskYear, rows[0].year), rows[rows.length - 1].year) : UI.riskYear, r = rows && rows.find((x) => x.year === yr);
+  const defs = [["Net worth", "worth", 0], ["Taxable", "taxable", 1], ["Pre-tax", "pretax", 1], ["Roth", "roth", 1], ["Real estate", "re", 1], ["Mortgages", "debt", 1],
+    ["Spending", "outflow", 0], ["Tax paid", "tax", 0], ["Roth conversion", "conv", 0], ["Social Security", "ss", 0]];
+  return `<div class="pc-year"><b>${yr}</b> <span class="muted small">${people().map((p) => esc(p.name) + " " + (yr - p.born)).join(" · ")}</span></div>
+    <table class="detail"><tbody>${defs.map(([label, key, sub]) => `<tr><th class="l ${sub ? "sub" : "top"}">${label}</th><td class="tA">${r ? money(r[key]) : "—"}</td></tr>`).join("")}</tbody></table>`;
+}
+// The picked path in full, like a plan in View: savings by account or spending by kind, by year.
+function pathFull(sel, doc) {
+  const rows = pathRows(sel, doc), W = 900, H = 250, L = 58, Rr = 10, T = 8, B = 26, pw = W - L - Rr, ph = H - T - B;
+  const LAYERS = UI.stack === "spend" ? SPEND : STACK;
+  const head = `<div class="chart-head"><span>${sel ? esc(sel.label) + " in full" : "The picked path in full"} · today's dollars</span>${seg([["worth", "Savings"], ["spend", "Spending"]], "stack")}</div>`;
+  const note = !sel ? "Pick a path to see it year by year, as in View."
+    : !rows ? (sel.solved ? "This run is from before paths kept every number; run it again to see this path in full."
+      : sel.short ? "Find when the money runs out (the button on the chart) to see this path up to its last good year." : "Owl could not solve this path.") : "";
+  let svg = "";
+  if (rows) {
+    const x0 = rows[0].year, x1 = rows[rows.length - 1].year, x = (yr) => L + (yr - x0) * pw / Math.max(1, x1 - x0);
+    let ymax = 1; rows.forEach((r) => { ymax = Math.max(ymax, LAYERS.reduce((t, [k]) => t + Math.max(0, r[k]), 0)); });
+    const st = niceStep(ymax); ymax = Math.ceil(ymax / st) * st;
+    const y = (v) => T + ph * (1 - v / ymax);
+    for (let v = 0; v <= ymax + 1e-6; v += st) svg += `<line x1="${L}" x2="${W - Rr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="${v ? "#2a2c31" : "#5a5c62"}"/><text x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${v ? money(v) : "$0"}</text>`;
+    let base = rows.map(() => 0);
+    LAYERS.forEach(([key, , fill]) => {
+      const top = rows.map((r, i) => base[i] + Math.max(0, r[key]));
+      svg += `<path d="M${rows.map((r, i) => x(r.year).toFixed(1) + "," + y(top[i]).toFixed(1)).join("L")}L${rows.map((r, i) => x(r.year).toFixed(1) + "," + y(base[i]).toFixed(1)).reverse().join("L")}Z" fill="${fill}" stroke="#17181b" stroke-width="1.5"/>`;
+      base = top;
+    });
+    for (let yr = x0; yr <= x1; yr++) if (yr % 5 === 0) svg += `<text x="${x(yr).toFixed(1)}" y="${H - 6}" text-anchor="middle">${yr}</text>`;
+    const cy = Math.min(Math.max(UI.riskYear, x0), x1);
+    svg += `<line id="path-cursor" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#8a8c92" transform="translate(${x(cy).toFixed(1)},0)" pointer-events="none"/>`;
+    svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(sel.label)}, year by year" data-x0="${x0}" data-x1="${x1}" data-l="${L}" data-pw="${pw}" data-cursor="path-cursor">${svg}</svg>`;
+  } else svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="No path picked"></svg>`;
+  const legend = LAYERS.map(([, label, fill]) => `<span><span class="chip" style="background:${fill}"></span>${label}</span>`).join("");
+  return `<div class="pfull">${head}<div class="legend" style="margin-left:0">${note ? `<span class="muted">${note}</span>` : legend}</div>
+    <div class="pfull-body"><div>${svg}</div><aside id="path-card">${pathCard(rows)}</aside></div></div>`;
+}
+
+// Savings left: net worth across the paths, as a band or as every path; the picked path's
+// markets and numbers in a panel of fixed size underneath, so picking moves nothing.
+function riskBody(data, color, plan, result, job) {
+  const S = riskStats(data), n = S.paths.length, lasted = S.ok.length;
+  const sel = S.paths.find((p) => p.value === UI.riskPath), every = UI.riskView === "paths";
+  const tiles = [
+    ["Lasted", `${lasted} of ${n}`, [S.short.length && `${S.short.length} ran short`, S.borderline.length && `${S.borderline.length} borderline`, S.stuck.length && `Owl could not solve ${S.stuck.length}`].filter(Boolean).join(" · ") || "Every path paid for everything"],
+    ["Savings left, median", money(quantile(S.ends, 0.5)), `Average markets: ${money(result.bequest)}`],
+    ["Savings left, P10", money(quantile(S.ends, 0.1)), "90% of lasting paths end above this"],
+    ["Lowest net worth on any path", S.low ? money(S.low.worth) : "—", S.low ? `${esc(S.low.path.label)}, in ${S.low.year}` : ""],
+  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+
+  // Net worth, log scale. Axis and scale are set once from every path, so nothing moves on a pick.
+  const W = 1200, H = 290, L = 64, Rr = 12, T = 10, B = 28, pw = W - L - Rr, ph = H - T - B;
+  const lineOf = (p) => (p.solved ? p.timeline : p.runout && p.runout.timeline) || [];
+  const drawn = S.paths.map(lineOf).filter((t) => t.length);
+  const yrs = S.bands.length ? S.bands.map((b) => b.year) : drawn.flat().concat(plan).map((r) => r.year);
+  const x0 = Math.min(...yrs), x1 = Math.max(...yrs, ...drawn.map((t) => t[t.length - 1].year));
+  const x = (yr) => L + (yr - x0) * pw / Math.max(1, x1 - x0);
+  let hi = 1e6; S.bands.forEach((b) => { hi = Math.max(hi, b.p90); });
+  drawn.forEach((t) => t.forEach((r) => { hi = Math.max(hi, r.worth); })); plan.forEach((r) => { hi = Math.max(hi, r.worth); });
+  let least = hi; S.bands.forEach((b) => { least = Math.min(least, b.p10); }); drawn.forEach((t) => t.forEach((r) => { least = Math.min(least, r.worth); }));
+  const floor = (v) => { const d = Math.pow(10, Math.floor(Math.log10(Math.max(v, 1e4)))); return [5, 2, 1].map((m) => m * d).find((c) => c <= v) || d; };
+  const lo = floor(least * 0.9), sc = logScale(lo, hi * 1.1, T, ph);
+  const area = (a, b) => S.bands.map((r, i) => `${i ? "L" : "M"}${x(r.year).toFixed(1)},${sc.y(r[a]).toFixed(1)}`).join("") + S.bands.slice().reverse().map((r) => `L${x(r.year).toFixed(1)},${sc.y(r[b]).toFixed(1)}`).join("") + "Z";
+  const line = (rows, k = "worth") => rows.map((r, i) => `${i ? "L" : "M"}${x(r.year).toFixed(1)},${sc.y(r[k]).toFixed(1)}`).join("");
+  if (!Number.isFinite(UI.riskYear) || UI.riskYear < x0 || UI.riskYear > x1) UI.riskYear = Math.min(x0 + 10, x1);
+  let grid = sc.ticks.map((v) => `<line x1="${L}" x2="${W - Rr}" y1="${sc.y(v).toFixed(1)}" y2="${sc.y(v).toFixed(1)}" stroke="#2a2c31"/><text x="${L - 6}" y="${(sc.y(v) + 4).toFixed(1)}" text-anchor="end">${money(v)}</text>`).join("");
+  for (let yr = x0; yr <= x1; yr++) if (yr % 5 === 0) grid += `<text x="${x(yr).toFixed(1)}" y="${H - 6}" text-anchor="middle">${yr}</text>`;
+  const kindOf = (p) => (p.solved ? (p.convergence === "unsolvable iterate" ? "edge" : "ok") : p.short ? "short" : "stuck");
+  const stroke = { ok: color, edge: "#d9a13b", short: "#e5484d" };
+  // Where a path that ran short ends: its last year that pays for everything.
+  const endMark = (p, on) => { const t = lineOf(p), e = t[t.length - 1]; return e && !p.solved ? `<circle cx="${x(e.year).toFixed(1)}" cy="${sc.y(e.worth).toFixed(1)}" r="${on ? 5 : 3.5}" fill="#e5484d"/>` : ""; };
+  // A path as a line that can be clicked: a wide, invisible line on top takes the click.
+  const pathLine = (p, on) => {
+    const t = lineOf(p); if (!t.length) return "";
+    const k = kindOf(p), d = line(t), tip = `${p.label}${k === "short" ? ": ran short" : k === "edge" ? ": borderline" : ""}`;
+    return `<g class="pl ${on ? "on" : ""}" data-act="riskPath" data-v="${p.value}"><path class="vis" d="${d}" fill="none" stroke="${on ? "#6fc2b5" : stroke[k]}" stroke-width="${on ? 2.5 : k === "ok" ? 1 : 1.5}" stroke-opacity="${on ? 1 : k === "ok" ? 0.35 : 0.85}"/>${endMark(p, on)}<path d="${d}" fill="none" stroke="transparent" stroke-width="9" pointer-events="stroke"><title>${esc(tip)}</title></path></g>`;
+  };
+  let marks;
+  if (every) marks = S.paths.filter((p) => p !== sel).map((p) => pathLine(p, false)).join("") + (sel ? pathLine(sel, true) : "");
+  else marks = (S.bands.length ? `<path d="${area("p0", "p100")}" fill="${color}" fill-opacity="0.07"/><path d="${area("p10", "p90")}" fill="${color}" fill-opacity="0.16"/><path d="${area("p25", "p75")}" fill="${color}" fill-opacity="0.32"/><path d="${line(S.bands, "p50")}" fill="none" stroke="${color}" stroke-width="2"/>` : "")
+    + (sel ? pathLine(sel, true) : "");
+  const fan = `<svg class="chart rchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Net worth across ${n} paths" data-x0="${x0}" data-x1="${x1}" data-l="${L}" data-pw="${pw}" data-t="${T}" data-ph="${ph}">${grid}
+    <rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="transparent"/>
+    ${marks}
+    <path d="${line(plan.filter((r) => r.year >= x0 && r.year <= x1))}" fill="none" stroke="#f0efec" stroke-width="1.5" stroke-dasharray="5 4" pointer-events="none"/>
+    <g id="fan-cursor" transform="translate(${x(UI.riskYear).toFixed(1)},0)" pointer-events="none"><line x1="0" x2="0" y1="${T + 14}" y2="${T + ph}" stroke="#8a8c92"/><text id="fan-cursor-year" x="0" y="${T + 10}" text-anchor="middle" style="fill:#f0efec">${UI.riskYear}</text></g></svg>`;
+
+  // On the chart: one button that finds when the money runs out on every path that ran short.
+  const todo = S.short.filter((p) => !p.runout), running = job && job.running;
+  const action = running ? `<span class="rbtn">Drawing the ${job.total === 1 ? "path" : job.total + " paths"} that ran short: ${job.done} of ${job.total} done…</span>`
+    : todo.length ? `<button type="button" class="rbtn" data-act="runoutAll">${todo.length} ${todo.length === 1 ? "path that ran short is" : "paths that ran short are"} not on the chart yet · Find when the money runs out · ${fmtTime(Math.ceil(todo.length / CONFIG.workers) * CONFIG.timings.runout)}</button>`
+    : job && job.error ? `<span class="rbtn short small">${esc(job.error)}</span>` : "";
+  const legend = `<div class="legend" style="margin-left:0">${every ? `<span><i class="ln" style="border-color:${color}"></i>A path that lasted</span>` : `<span><i class="sw" style="background:${color};opacity:.16"></i>P0–P100, every path</span><span><i class="sw" style="background:${color};opacity:.35"></i>P10–P90</span><span><i class="sw" style="background:${color};opacity:.7"></i>P25–P75</span><span><i class="ln" style="border-color:${color}"></i>Median</span>`}
+    <span><i class="ln" style="border-color:#e5484d"></i>Ran short (${S.short.length})</span><span><i class="ln" style="border-color:#d9a13b"></i>Borderline (${S.borderline.length})</span><span><i class="ln dash"></i>Average markets</span>
+    ${riskLife() ? `<span class="muted">With life-table lifespans paths end in different years; the band covers the paths still running</span>` : ""}</div>`;
+
+  // The panel under the chart: same size whether or not a path is picked.
+  const dots = { short: ["#e5484d", "Ran short"], edge: ["#d9a13b", "Borderline"], stuck: ["#6f7278", "Owl could not solve"] };
+  const picker = dropdown({ attrs: 'data-act="riskPathPick"', value: sel ? String(sel.value) : "", cls: "field text", label: "Path",
+    options: [{ value: "", label: "Pick a path…" }].concat(S.paths.map((p) => { const d = dots[kindOf(p)]; return { value: String(p.value), label: p.label, dot: d && d[0], dotTitle: d && d[1] }; })) });
+  const panel = `<div class="rdetail">
+      <div class="rdetail-head"><div class="dd-inline">${picker}</div><div class="rline" title="${sel ? esc(pathStatus(sel).replace(/<[^>]+>/g, "")) : ""}">${sel ? pathStatus(sel) : `<span class="muted">${every ? "Click a line on the chart, or pick a path here." : "Pick a path here, or switch to every path and click one."}</span>`}</div>
+        <button type="button" data-act="riskPath" data-v="${sel ? sel.value : ""}" ${sel ? "" : "disabled"}>Clear</button></div>
+      ${returnsPanel(sel, x0, x1, L, pw)}</div>`;
+
+  return `<div class="tiles">${tiles}</div>
+    <div class="chart-head"><span>Net worth, today's dollars · log scale</span>${seg([["band", "Band"], ["paths", "Every path"]], "riskView")}</div>
+    <div class="fan-read" id="fan-read">${fanReadout()}</div>
+    <div class="rwrap">${fan}${action}</div>${legend}
+    ${panel}
+    ${pathFull(sel, SLOTS[UI.riskSlot].doc)}`;
+}
+
+// ---------- page ----------
+// A list left open would point at a field the redraw replaced.
+addEventListener("resize", () => ddClose());
+// Scrolling the page closes an open list, except the scroll that opening it may cause.
+document.addEventListener("scroll", (ev) => { if (DD && !DD.pop.contains(ev.target) && Date.now() - DD.opened > 300) ddClose(); }, true);
+function render() {
+  ddClose();
+  renderBar();
+  const bar = document.querySelector("header");
+  if (bar) document.documentElement.style.setProperty("--bar-h", bar.offsetHeight + "px");
+  const main = document.getElementById("main");
+  if (!SLOTS.A.doc) return;
+  const focus = document.activeElement && document.activeElement.id;
+  main.innerHTML = UI.editing ? renderInputs() : UI.page === "risk" ? renderRisk() : renderTimeline() + renderOutcome();
+  renderModal();
+  if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
+}
+function renderTimelineOnly() {
+  const old = document.querySelector('section[aria-label="Timeline"]');
+  if (!old) return render();
+  const body = old.querySelector(".years-body"), left = body ? body.scrollLeft : 0;
+  const wrap = document.createElement("div"); wrap.innerHTML = renderTimeline();
+  old.replaceWith(wrap.firstElementChild);
+  const now = document.querySelector(".years-body");
+  if (now && left) { now.scrollLeft = left; now.parentElement.querySelector(".years-head").scrollLeft = left; }
+}
+
+// ---------- editing ----------
+function parse(field, raw) {
+  if (field.type === "bool") return !!raw;
+  if (field.type === "text" || field.type === "select") return raw;
+  const clean = String(raw).replace(/[^0-9.\-]/g, "");
+  if (clean === "" || isNaN(Number(clean))) return field.optional ? null : 0;
+  if (field.type === "year") return Math.round(Number(clean));
+  // 250k and 1.5M mean thousands and millions, not 250 and 1.5.
+  const unit = field.type === "money" && /([km])\s*$/i.exec(String(raw).trim());
+  return Number(clean) * (unit ? (unit[1].toLowerCase() === "k" ? 1e3 : 1e6) : 1);
+}
+function fieldFor(path) {
+  const parts = path.split(".");
+  if (CONFIG.lists[parts[0]]) return CONFIG.lists[parts[0]].fields.find((f) => f.key === parts[2]);
+  for (const s of CONFIG.sections) for (const f of s.fields || []) if (f.key === parts[0]) return f;
+  return null;
+}
+function setPath(doc, path, value) {
+  const parts = path.split(".");
+  if (parts.length === 1) doc[parts[0]] = value;
+  else if (parts.length === 2) { doc[parts[0]] = (doc[parts[0]] || []).slice(); doc[parts[0]][+parts[1]] = value; }
+  else { doc[parts[0]] = doc[parts[0]].map((it, i) => i === +parts[1] ? Object.assign({}, it, { [parts[2]]: value }) : it); }
+}
+function newItem(list, doc) {
+  const start = doc.planStart;
+  if (list === "properties") return { name: "New property", use: "other", value: 0, cost: 0, mortgage: 0, rate: 0, years: 0, sellYear: null, income: 0, growth: 0 };
+  if (list === "children") return { name: "New child", born: start, collegeStart: start + 18, years: 4, cost: 0 };
+  return { name: "New band", amount: 10000, from: start, to: start + 9, grows: "prices", kind: "other" };
+}
+
+document.addEventListener("change", (ev) => {
+  const el = ev.target;
+  if (el.dataset.riskPick) {
+    // Risk analyzes one scenario. Choosing the one in View's compare column swaps the two, so
+    // View keeps both plans.
+    const was = SLOTS.A.doc.id;
+    if (two() && el.value === SLOTS.B.doc.id) { (async () => { await pick("B", was, true); await pick("A", el.value); })(); }
+    else pick("A", el.value);
+    return;
+  }
+  if (el.dataset.pick) { pick(el.dataset.pick, el.value); return; }
+  if (el.dataset.act === "house") {
+    if (el.value === "__clear") { clearCache(); renderBar(); return; }
+    if (el.value === "__edit") openHouse("edit");
+    else if (el.value === "__new") openHouse("new");
+    else { switchHouse(el.value); return; }
+    renderBar(); return;
+  }
+  if (el.dataset.act === "riskMeasure") { UI.riskMeasure = el.value; UI.riskPath = null; renderRiskOnly(); return; }
+  if (el.dataset.act === "riskPathPick") { UI.riskPath = el.value === "" ? null : +el.value; renderRiskOnly(); return; }
+  if (el.dataset.act === "riskKind") { UI.riskKind = el.value; UI.riskPath = null; renderRiskOnly(); return; }
+  if (el.dataset.act === "houseCount") {
+    // Keep what was typed while the form redraws for one or two people.
+    const md = UI.modal, typed = readHouseForm();
+    md.state = typed.state;
+    md.people = [0, 1].slice(0, +el.value).map((i) => typed.people[i] || { name: "", born: "", sex: "F" });
+    renderModal(); return;
+  }
+  if (el.dataset.act === "diffOnly") { UI.diffOnly = el.checked; render(); return; }
+  if (!el.dataset.path) return;
+  const slot = el.dataset.slot, field = fieldFor(el.dataset.path);
+  if (!field) return;
+  setPath(SLOTS[slot].doc, el.dataset.path, parse(field, field.type === "bool" ? el.checked : el.value));
+  render();
+  save(slot);
+});
+// The year table's header follows its body sideways.
+document.addEventListener("scroll", (ev) => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.sync === "years") { const head = el.parentElement.querySelector(".years-head"); if (head) head.scrollLeft = el.scrollLeft; }
+}, true);
+document.addEventListener("keydown", (ev) => {
+  if (DD) {
+    const items = [...DD.pop.querySelectorAll("button:not(:disabled)")], at = items.indexOf(document.activeElement);
+    if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); ddClose(true); return; }
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") { ev.preventDefault(); const next = items[(at + (ev.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]; if (next) next.focus(); return; }
+    if (ev.key === "Home" || ev.key === "End") { ev.preventDefault(); (ev.key === "Home" ? items[0] : items[items.length - 1]).focus(); return; }
+    if (ev.key === "Tab") { ddClose(); }
+    // Typing jumps to the first option that starts with what was typed.
+    if (ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey && /\S/.test(ev.key)) {
+      clearTimeout(DD.timer); DD.typed = (DD.typed || "") + ev.key.toLowerCase(); DD.timer = setTimeout(() => { if (DD) DD.typed = ""; }, 700);
+      const hit = items.find((b) => b.textContent.trim().toLowerCase().startsWith(DD.typed));
+      if (hit) hit.focus();
+      return;
+    }
+  } else if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && ev.target.classList && ev.target.classList.contains("dd-btn")) { ev.preventDefault(); ddOpen(ev.target); return; }
+  if (ev.key === "Escape" && UI.modal && UI.modal.kind !== "solving") { UI.modal = null; renderModal(); }
+  if (ev.key === "Enter" && ev.target.matches("input.in")) ev.target.blur();
+});
+document.addEventListener("click", async (ev) => {
+  const ddBtn = ev.target.closest(".dd-btn"), ddOpt = ev.target.closest(".dd-pop [role=option]");
+  if (ddOpt) { ddChoose(ddOpt.dataset.v); return; }
+  if (ddBtn) { if (DD && DD.btn === ddBtn) ddClose(true); else ddOpen(ddBtn); return; }
+  if (DD && !ev.target.closest(".dd-pop")) ddClose();
+  const el = ev.target.closest("[data-act]");
+  const yearEl = ev.target.closest("[data-year]");
+  if (yearEl && !el) { UI.year = +yearEl.dataset.year; renderTimelineOnly(); UI.modal = { kind: "year", year: UI.year }; renderModal(); return; }
+  if (!el) return;
+  const act = el.dataset.act, slot = el.dataset.slot;
+  if (act === "scrim") { if (ev.target === el && UI.modal.kind !== "solving") { UI.modal = null; renderModal(); } return; }
+  if (act === "page") {
+    UI.page = el.dataset.v; history.replaceState(null, "", UI.page === "risk" ? "#risk" : location.pathname);
+    // Leaving the form by a tab solves the edits, as Done does.
+    if (UI.editing) { finishEditing(); return; }
+    render(); window.scrollTo(0, 0); return;
+  }
+  if (act === "riskRun") { riskRun(); return; }
+  if (act === "runoutAll") {
+    const [id, kind, life] = riskKey().split("|");
+    try { await api("POST", `/api/scenarios/${id}/risk/${kind}/runout-all${life === "1" ? "?life=1" : ""}`); } catch (err) { alert(err.message); }
+    riskLoad(); return;
+  }
+  if (act === "riskPath") { UI.riskPath = el.dataset.v === "" || +el.dataset.v === UI.riskPath ? null : +el.dataset.v; renderRiskOnly(); return; }
+  if (act === "edit") { UI.editing = true; render(); window.scrollTo(0, 0); return; }
+  if (act === "done") { finishEditing(); return; }
+  if (act === "ui") {
+    UI[el.dataset.k] = el.dataset.v;
+    if (UI.modal && UI.modal.kind === "year") renderModal();
+    else if (UI.page === "risk" && !UI.editing) { if (!["riskYear", "riskView", "stack"].includes(el.dataset.k)) UI.riskPath = null; renderRiskOnly(); }
+    else renderTimelineOnly();
+    return;
+  }
+  if (act === "yearModal") {
+    const years = rowsOf(SLOTS.A.doc).concat(rowsOf(SLOTS.B.doc)).map((r) => r.year), y = +el.dataset.v;
+    if (y < Math.min(...years) || y > Math.max(...years)) return;
+    UI.year = y; renderTimelineOnly(); UI.modal = { kind: "year", year: y }; renderModal(); return;
+  }
+  if (act === "year") { UI.year = +el.dataset.v; renderTimelineOnly(); return; }
+  if (act === "toggle") { UI.open[el.dataset.v] = !UI.open[el.dataset.v]; render(); return; }
+  if (act === "close") { UI.modal = null; renderModal(); return; }
+  if (act === "household") { UI.modal = { kind: "household" }; renderModal(); return; }
+  if (act === "item") { UI.modal = { kind: "item", slot, list: el.dataset.list, i: +el.dataset.i }; renderModal(); return; }
+  if (act === "bands") { UI.modal = { kind: "bands", slot }; renderModal(); return; }
+  if (act === "add") {
+    const doc = SLOTS[slot].doc, list = el.dataset.list;
+    doc[list] = (doc[list] || []).concat([newItem(list, doc)]);
+    if (list !== "spendingBands") UI.modal = { kind: "item", slot, list, i: doc[list].length - 1 };
+    render(); save(slot); return;
+  }
+  if (act === "remove") {
+    const doc = SLOTS[slot].doc, list = el.dataset.list, i = +el.dataset.i;
+    doc[list] = doc[list].filter((_, j) => j !== i);
+    if (UI.modal && UI.modal.kind === "item") UI.modal = null;
+    render(); save(slot); return;
+  }
+  if (act === "cloneAsk") { UI.modal = { kind: "clone", slot }; renderModal(); document.getElementById("clone-name").select(); return; }
+  if (act === "clone") {
+    // The copy opens in the other column, beside the scenario it came from.
+    const from = UI.modal.slot, into = from === "A" ? "B" : "A";
+    const name = document.getElementById("clone-name").value.trim(), description = document.getElementById("clone-desc").value.trim();
+    if (!name) { document.getElementById("clone-name").focus(); return; }
+    try {
+      const made = (await api("POST", "/api/scenarios", { copyFrom: SLOTS[from].doc.id, name, description })).data;
+      LIST = (await api("GET", "/api/scenarios")).data;
+      UI.modal = null;
+      await pick(into, made.id);
+    } catch (err) { alert(err.message); }
+    return;
+  }
+  if (act === "saveHouse") {
+    const form = readHouseForm(), fresh = UI.modal.mode === "new", error = document.getElementById("hh-error");
+    if (form.people.some((p) => !p.name || !/^(19|20)\d\d$/.test(p.born))) { error.textContent = "Give each person a name and a four-digit birth year."; return; }
+    try {
+      if (fresh) {
+        const made = (await api("POST", "/api/households", form)).data;
+        LIST = (await api("GET", "/api/scenarios")).data;
+        HOUSES = (await api("GET", "/api/households")).data;
+        UI.modal = null; renderModal();
+        UI.editing = true; UI.open = { "Accounts": true };
+        await switchHouse(made.id);
+        window.scrollTo(0, 0);
+        return;
+      }
+      HOUSE = (await api("PUT", "/api/households/" + HOUSE.id, form)).data;
+      HOUSES = (await api("GET", "/api/households")).data;
+    } catch (err) { error.textContent = err.message; return; }
+    UI.modal = null;
+    render();
+    if (UI.editing) { slots().forEach((s) => { SLOTS[s].dirty = true; }); renderBar(); } else slots().forEach(solve);
+  }
+});
+// The year marker on Risk follows the pointer, worked out from its position, without a redraw.
+document.addEventListener("mousemove", (ev) => {
+  const svg = ev.target.closest && ev.target.closest("#main section.risk svg[data-x0]");
+  if (!svg) return;
+  const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const at = pt.matrixTransform(svg.getScreenCTM().inverse()), d = svg.dataset;
+  const x0 = +d.x0, x1 = +d.x1, L = +d.l, pw = +d.pw;
+  const yr = Math.min(x1, Math.max(x0, Math.round(x0 + (at.x - L) * (x1 - x0) / pw)));
+  if (yr === UI.riskYear) return;
+  UI.riskYear = yr;
+  const box = document.getElementById("fan-read"), cursor = document.getElementById("fan-cursor"), label = document.getElementById("fan-cursor-year");
+  if (box) box.innerHTML = fanReadout();
+  const fs = document.querySelector("svg.rchart"), f = fs && fs.dataset;
+  if (cursor && f) cursor.setAttribute("transform", `translate(${(+f.l + (yr - +f.x0) * +f.pw / Math.max(1, +f.x1 - +f.x0)).toFixed(1)},0)`);
+  if (label) label.textContent = yr;
+  // The picked path's chart and card follow the same year.
+  const card = document.getElementById("path-card"), pc = document.getElementById("path-cursor");
+  const sel = (RISK[riskKey()] && RISK[riskKey()].result && RISK[riskKey()].result.paths || []).find((p) => p.value === UI.riskPath);
+  const rows = sel ? pathRows(sel, SLOTS[UI.riskSlot].doc) : null;
+  if (card) card.innerHTML = pathCard(rows);
+  if (pc && rows) { const ps = pc.ownerSVGElement.dataset, a = +ps.x0, b = +ps.x1, c = Math.min(Math.max(yr, a), b); pc.setAttribute("transform", `translate(${(+ps.l + (c - a) * +ps.pw / Math.max(1, b - a)).toFixed(1)},0)`); }
+});
+document.addEventListener("mouseover", (ev) => {
+  const col = ev.target.closest("svg.chart [data-year], .years tr[data-year]");
+  if (col && !drag && +col.dataset.year !== UI.year) { UI.year = +col.dataset.year; renderTimelineOnly(); }
+});
+
+// Dragging a band's end in the spending plan changes its years.
+let drag = null;
+document.addEventListener("pointerdown", (ev) => {
+  const h = ev.target.closest("[data-drag]");
+  if (!h) return;
+  const svg = document.getElementById("bands-svg");
+  drag = { end: h.dataset.drag, i: +h.dataset.i, slot: svg.dataset.slot, moved: false };
+  ev.preventDefault();
+});
+document.addEventListener("pointermove", (ev) => {
+  if (!drag) return;
+  const svg = document.getElementById("bands-svg"), pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const x = pt.matrixTransform(svg.getScreenCTM().inverse()).x;
+  const start = +svg.dataset.start, last = +svg.dataset.last, cw = +svg.dataset.cw, L = +svg.dataset.l;
+  const band = SLOTS[drag.slot].doc.spendingBands[drag.i];
+  let year = Math.round((x - L) / cw + start - (drag.end === "to" ? 1 : 0));
+  year = Math.min(Math.max(year, start), last);
+  year = drag.end === "from" ? Math.min(year, band.to) : Math.max(year, band.from);
+  if (band[drag.end] !== year) { setPath(SLOTS[drag.slot].doc, "spendingBands." + drag.i + "." + drag.end, year); drag.moved = true; renderModal(); }
+});
+document.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved) { render(); save(d.slot); }
+});
+
+load().catch((err) => { document.getElementById("main").innerHTML = `<div class="empty">Could not load: ${esc(err.message)}</div>`; });
+</script>
+</body>
+</html>

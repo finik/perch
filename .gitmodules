@@ -1,0 +1,4 @@
+[submodule "vendor/Owl"]
+	path = vendor/Owl
+	url = https://github.com/mdlacasse/Owl.git
+	branch = dev

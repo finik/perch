@@ -1,0 +1,17 @@
+{
+  "name": "Alex & Sam (sample)",
+  "status": "married",
+  "state": "CA",
+  "people": [
+    {
+      "name": "Alex",
+      "born": 1972,
+      "sex": "F"
+    },
+    {
+      "name": "Sam",
+      "born": 1974,
+      "sex": "M"
+    }
+  ]
+}

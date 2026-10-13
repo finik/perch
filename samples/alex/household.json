@@ -1,0 +1,12 @@
+{
+  "name": "Alex (sample)",
+  "status": "single",
+  "state": "CA",
+  "people": [
+    {
+      "name": "Alex",
+      "born": 1972,
+      "sex": "F"
+    }
+  ]
+}
