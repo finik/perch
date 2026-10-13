@@ -1166,6 +1166,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/scenarios":
             self._send(200, self._list())
             return
+        if rest == ["risk-summary"]:
+            if scenario_file(ident) is None or not scenario_file(ident).exists():
+                self._send(404, {"error": "not found"})
+                return
+            self._send(200, risk_summary(ident))
+            return
         if rest == ["regret"]:
             if scenario_file(ident) is None or not scenario_file(ident).exists():
                 self._send(404, {"error": "not found"})
@@ -1513,7 +1519,116 @@ def move_to_cache() -> None:
                 risk.rmdir()
 
 
+# ---------- a few numbers from each saved analysis, for View ----------
+def quantile(values: list, q: float):
+    """The same interpolation the page uses."""
+    if not values:
+        return None
+    at = (len(values) - 1) * q
+    lo, hi = int(at), min(int(at) + 1, len(values) - 1)
+    return values[lo] + (values[hi] - values[lo]) * (at - lo)
+
+
+def risk_summary(ident: str) -> list:
+    """For each analysis saved for this scenario: whether it is current, and its headline numbers."""
+    current = fingerprint(read_doc(scenario_file(ident)))
+    out = []
+    for kind in RISK_KINDS:
+        for life in (False, True):
+            for spend in (False, True):
+                file = risk_file(ident, kind, life, spend)
+                if not file.exists():
+                    continue
+                data = json.loads(file.read_text())
+                paths = data["paths"]
+                settled = [p for p in paths if p["solved"] and p.get("convergence") != "unsolvable iterate"]
+                row = {"measure": "spend" if spend else "left", "kind": kind, "life": life, "stale": data.get("fingerprint") != current,
+                       "total": len(paths), "lasted": len(settled), "short": sum(1 for p in paths if not p["solved"] and p.get("short"))}
+                if spend:
+                    can = sorted(p["spending"] for p in paths if p["solved"] and p.get("spending") is not None)
+                    # The most that 9 in 10 paths can pay every year.
+                    row["safe90"] = max([v for v in can if sum(1 for w in can if w >= v) / len(paths) >= 0.9], default=0)
+                else:
+                    ends = sorted(p["bequest"] for p in settled)
+                    row["p10"], row["median"] = quantile(ends, 0.1), quantile(ends, 0.5)
+                out.append(row)
+    file = owl_tool_file(ident, "frontier")
+    if file.exists():
+        data = json.loads(file.read_text())
+        pts = [(g, pr) for g, pr in zip(data.get("frontier_g_year1") or [], data.get("frontier_prob_year1") or []) if g is not None and pr is not None]
+        out.append({"measure": "owl-frontier", "kind": "history", "life": False, "stale": data.get("fingerprint") != current,
+                    "safe90": max([g for g, pr in pts if pr <= 0.1 + 1e-9], default=0)})
+    return out
+
+
+# ---------- running analyses from the command line ----------
+CLI_ANALYSES = {
+    "history": ("risk", "history", False, False), "random": ("risk", "random", False, False),
+    "random-life": ("risk", "random", True, False), "garch_dcc": ("risk", "garch_dcc", False, False),
+    "garch_dcc-life": ("risk", "garch_dcc", True, False), "spend": ("risk", "history", False, True),
+    "regret": ("regret",), "owl-frontier": ("owl", "frontier"), "owl-regret": ("owl", "regret"),
+    "runout": ("runout",),
+}
+
+
+def cli_run(args: list) -> None:
+    """perch.py run <household or household/scenario> [analysis ...]: what the Risk page runs, here."""
+    if not args or args[0] in ("-h", "--help"):
+        print("Usage: python3 perch.py run <household>[/<scenario>] [analysis ...]\n"
+              f"Analyses (default history): {', '.join(CLI_ANALYSES)}\n"
+              "runout finds when the money runs out on the paths that ran short in the runs saved for the scenario.")
+        return
+    target, wanted = args[0], args[1:] or ["history"]
+    unknown = [a for a in wanted if a not in CLI_ANALYSES]
+    if unknown:
+        raise SystemExit(f"Unknown analysis: {', '.join(unknown)}. Choose from {', '.join(CLI_ANALYSES)}.")
+    if "/" in target:
+        idents = [target] if scenario_file(target) and scenario_file(target).exists() else []
+    else:
+        idents = [f"{target}/{f.stem}" for f in scenario_files(DATA / target)] if (DATA / target / HOUSE_FILE).exists() else []
+    if not idents:
+        raise SystemExit(f"No scenario or household {target!r} in {DATA}.")
+
+    def wait(job: dict, what: str) -> None:
+        began = time.time()
+        while job.get("running"):
+            print(f"\r  {what}: {job.get('done', 0)} of {job.get('total') or '…'} · {time.time() - began:.0f} s   ", end="", flush=True)
+            time.sleep(1)
+        print(f"\r  {what}: {'failed: ' + job['error'] if job.get('error') else 'done'} in {time.time() - began:.0f} s" + " " * 20)
+
+    for ident in idents:
+        print(ident)
+        doc = read_doc(scenario_file(ident))
+        if not doc.get("result"):
+            print("  solving the plan first")
+            doc["result"] = solve(doc)
+            write_doc(ident, doc)
+        for name in wanted:
+            how = CLI_ANALYSES[name]
+            if how[0] == "risk":
+                wait(start_risk(ident, *how[1:]), name)
+            elif how[0] == "regret":
+                wait(start_regret(ident), name)
+            elif how[0] == "owl":
+                wait(start_owl_tool(ident, how[1]), name)
+            else:
+                for kind in RISK_KINDS:
+                    for life in (False, True):
+                        if risk_file(ident, kind, life).exists():
+                            wait(start_runout_all(ident, kind, life), f"runout {kind}{'-life' if life else ''}")
+        for row in risk_summary(ident):
+            label = f"{row['measure']} {row['kind']}{'-life' if row['life'] else ''}" + (" (out of date)" if row["stale"] else "")
+            if row["measure"] == "left":
+                print(f"  {label}: {row['lasted']} of {row['total']} lasted, P10 savings left ${row['p10'] or 0:,.0f}")
+            else:
+                print(f"  {label}: ${row['safe90']:,.0f} a year works in 9 of 10")
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        move_to_cache()
+        cli_run(sys.argv[2:])
+        return
     made = init_data()
     move_to_cache()
     if len(sys.argv) > 1 and sys.argv[1] == "init":

@@ -44,6 +44,9 @@ The page has two tabs, **View** and **Risk Analysis**.
 - The outcome over the whole plan: taxes by kind, Social Security received, Roth conversions,
   and what goes to the children: college, gifts while alive, the estate, estate tax above the
   exemption, and the income tax heirs owe on inherited pre-tax money.
+- How the plan held up across markets, for each Risk analysis already run: how many paths
+  lasted, savings left in the bad case (P10), and the spending that works in 9 of 10 histories,
+  marked when the plan has changed since. Each line opens that analysis.
 
 ![Two plans side by side](docs/compare.png)
 
@@ -163,6 +166,17 @@ results…* in the household menu); Perch then solves the plans again.
 
 The first run creates the folder from the samples and never overwrites one that exists.
 `python3 perch.py init` creates it without starting the server.
+
+## Running analyses from the command line
+
+Every analysis on the Risk page can also be run from a terminal, for one scenario or every
+scenario of a household; the results show on the page as if run there.
+
+```sh
+python3 perch.py run alex-and-sam/retire-now history random runout
+python3 perch.py run alex-and-sam spend owl-frontier
+python3 perch.py run --help        # the list of analyses
+```
 
 ## Settings
 

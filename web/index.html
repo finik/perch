@@ -224,6 +224,8 @@
   table.regret tr.on td { background: var(--raise); }
   table.regret .short { color: #e5484d; font-weight: 600; }
   .rwrap { position: relative; }
+  .linkish { border: 0; padding: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .linkish.muted { color: var(--muted); }
   .dd-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
   .stage { margin-top: 12px; }
   .stage-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 80px; }
@@ -429,6 +431,7 @@ async function clearCache() {
   if (!confirm(`Clear every saved result for ${HOUSE.name}? This deletes the solved plans and all Risk Analysis runs. Your inputs stay, and the plans on screen are solved again.`)) return;
   try { await api("POST", `/api/households/${HOUSE.id}/clear-cache`); } catch (err) { alert(err.message); return; }
   for (const k in RISK) if (k.startsWith(HOUSE.id + "/")) { clearTimeout(POLL[k]); delete POLL[k]; delete RISK[k]; }
+  for (const k in SUMMARY) if (k.startsWith(HOUSE.id + "/")) delete SUMMARY[k];
   LIST = (await api("GET", "/api/scenarios")).data;
   UI.riskPath = null;
   // Load the plans on screen again; with no saved result, each is solved.
@@ -507,6 +510,7 @@ async function solveOnce(slot) {
       S.doc = data; S.seconds = data.result.seconds; mirror(slot);
       // Risk results kept on the page may now be out of date; the server says so on the next load.
       Object.keys(RISK).forEach((k) => { if (k.startsWith(id + "|") && !riskBusy(RISK[k])) delete RISK[k]; });
+      delete SUMMARY[id];
     }
   } catch (err) { if (S.doc && S.doc.id === id) S.error = err.message; }
   S.busy = "";
@@ -876,6 +880,7 @@ function renderOutcome() {
       college, gifts, estate: e.worth, estateTax: -estateTax, heirsTax: -heirs, net: college + gifts + e.worth - estateTax - heirs };
   };
   const [oa, ob] = docs.map((d) => d && calc(d));
+  docs.forEach((d) => d && loadSummary(d.id));
   if (!oa || (two() && !ob)) return `<section class="panel outcome" aria-label="Outcome over the whole plan"><b>Outcome over the whole plan</b><div class="empty">Waiting for Owl…</div></section>`;
   const OUT = [["Taxes paid", "tax", 0, 1], ["Federal income tax", "fed", 1], ["Capital gains tax", "gains", 1], ["Investment income tax", "niit", 1], ["State tax", "state", 1],
     ["Social Security received", "ss", 0], ["Converted to Roth", "conv", 0],
@@ -884,9 +889,48 @@ function renderOutcome() {
     <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><b>Outcome over the whole plan</b><span class="muted small">Today's dollars, added up over every year</span></div>
     <div style="overflow-x:auto"><table><tbody>
       ${OUT.map(([label, key, sub, head]) => `<tr class="${head ? "head" : ""}"><th class="l ${sub ? "sub" : ""}">${label}</th><td class="tA">${money(oa[key])}</td>${ob ? `<td class="tB">${money(ob[key])}</td>` : ""}</tr>`).join("")}
+      ${acrossRows(two() ? docs : [docs[0]])}
     </tbody></table></div>
     <div class="muted small">Estate tax: ${Math.round(rules.estateRate * 100)}% above ${money(exemption())}${people().length > 1 ? " for a couple" : ""}. Gifts and college are counted as paid, not grown. Real estate counts at today's value.</div>
   </section>`;
+}
+
+// ---------- Risk Analysis results in View ----------
+// Headline numbers of the analyses already saved for a plan, fetched once and kept until it changes.
+const SUMMARY = {};
+async function loadSummary(id) {
+  if (!id || id in SUMMARY) return;
+  SUMMARY[id] = null;   // loading
+  try { SUMMARY[id] = (await api("GET", `/api/scenarios/${id}/risk-summary`)).data; } catch (err) { SUMMARY[id] = []; }
+  const old = document.querySelector("section.outcome");
+  if (old && UI.page === "compare" && !UI.editing) old.outerHTML = renderOutcome();
+}
+// The lines shown, in this order; a line appears when either plan has it, real history always.
+const ACROSS = [
+  ["left", "history", false, "Real history: lasted"], ["left", "random", false, "Random history: lasted"],
+  ["left", "random", true, "Random history, life-table lifespans: lasted"], ["left", "garch_dcc", false, "Calm and stormy spells: lasted"],
+  ["left", "garch_dcc", true, "Calm and stormy spells, life-table lifespans: lasted"],
+  ["spend", "history", false, "Spending that works in 9 of 10 histories · Perch"], ["owl-frontier", "history", false, "Spending that works in 9 of 10 histories · Owl"],
+];
+function acrossRows(docs) {
+  const sums = docs.map((d) => d && SUMMARY[d.id]);
+  const find = (sum, [m, k, l]) => (sum || []).find((r) => r.measure === m && r.kind === k && r.life === l);
+  const cell = (slot, doc, sum, line) => {
+    if (!doc) return "";
+    const r = find(sum, line), [m, k, l] = line;
+    const go = `data-act="riskOpen" data-slot="${slot}" data-m="${m}" data-k="${k}" data-l="${l ? 1 : 0}"`;
+    let text;
+    if (sum == null) text = `<span class="muted">…</span>`;
+    else if (!r) text = `<button type="button" class="linkish muted" ${go}>not run yet</button>`;
+    else {
+      const v = m === "left" ? `${r.lasted} of ${r.total} · P10 ${money(r.p10)}` : `${money(r.safe90)} a year`;
+      text = `<button type="button" class="linkish ${r.stale ? "muted" : ""}" ${go} title="${r.stale ? "Run before the plan changed" : "Open in Risk Analysis"}">${v}${r.stale ? " · out of date" : ""}</button>`;
+    }
+    return `<td class="t${slot}">${text}</td>`;
+  };
+  const lines = ACROSS.filter((line, i) => i === 0 || sums.some((sum) => find(sum, line)));
+  return `<tr class="head"><th class="l">Across markets <span class="muted small">(Risk Analysis)</span></th>${docs.map((d, i) => d ? `<td></td>` : "").join("")}</tr>`
+    + lines.map((line) => `<tr><th class="l sub">${line[3]}</th>${docs.map((d, i) => cell(i ? "B" : "A", d, sums[i], line)).join("")}</tr>`).join("");
 }
 
 // ---------- the year's to-do list ----------
@@ -1130,7 +1174,7 @@ async function riskLoad(key = riskKey()) {
   try { RISK[key] = (await api("GET", riskUrl(key))).data; } catch (err) { RISK[key] = { error: err.message }; }
   // The next poll is set before drawing, so drawing does not start a second one.
   if (riskBusy(RISK[key])) POLL[key] = setTimeout(() => riskLoad(key), 1500);
-  else delete POLL[key];
+  else { delete POLL[key]; delete SUMMARY[key.split("|")[0]]; }   // View fetches the new numbers
   if (UI.page === "risk" && !UI.editing && key === riskKey()) renderRiskOnly();
 }
 const riskBusy = (st) => !!st && ((st.job && st.job.running) || (st.runoutJob && st.runoutJob.running));
@@ -1658,6 +1702,12 @@ document.addEventListener("click", async (ev) => {
     render(); window.scrollTo(0, 0); return;
   }
   if (act === "riskRun") { riskRun(); return; }
+  if (act === "riskOpen") {
+    // Risk Analysis looks at the pink plan; opening the blue one's swaps them, as the Risk picker does.
+    if (el.dataset.slot === "B" && two()) { const a = SLOTS.A.doc.id, b = SLOTS.B.doc.id; await pick("B", a, true); await pick("A", b, true); }
+    Object.assign(UI, { page: "risk", editing: false, riskMeasure: el.dataset.m, riskKind: el.dataset.k, riskLife: el.dataset.l, riskPath: null });
+    history.replaceState(null, "", "#risk"); render(); window.scrollTo(0, 0); return;
+  }
   if (act === "runoutAll") {
     const [id, kind, life] = riskKey().split("|");
     try { await api("POST", `/api/scenarios/${id}/risk/${kind}/runout-all${life === "1" ? "?life=1" : ""}`); } catch (err) { alert(err.message); }
