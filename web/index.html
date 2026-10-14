@@ -51,6 +51,8 @@
   .dd-pop button:disabled { color: var(--muted); cursor: default; }
   .dd-pop button .tick { width: 12px; flex: none; }
   .dd-pop button[aria-selected="true"] { color: var(--text); }
+  .dd-pop button.tinted { background: var(--bg); }
+  .dd-pop button.tinted:hover:not(:disabled), .dd-pop button.tinted:focus-visible { background: var(--bg); box-shadow: inset 0 0 0 1px var(--soft); }
   .dd-sep { height: 1px; background: var(--line); margin: 4px 2px; }
   .pick .dd { width: auto; }
   .pick .dd-btn { min-width: 200px; }
@@ -322,7 +324,8 @@ const CLOSE = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true
 // A dropdown drawn by the page. The hidden input holds the value and carries the data-* and id
 // attributes, so the change handler and the forms read it like any other field.
 // options: [{ value, label, disabled }] or { divider: true }.
-// An option may carry a colored dot after its label (dot: color, dotTitle: what it means).
+// An option may carry a colored dot after its label (dot: color, dotTitle: what it means),
+// and a background tint in the list (bg: color, bgTitle: what it means).
 const ddText = (o) => `${esc(o.label || "")}${o.dot ? ` <i class="dd-dot" style="background:${o.dot}" title="${esc(o.dotTitle || "")}"></i>` : ""}`;
 function dropdown({ attrs = "", value, options, cls = "", label = "", disabled = false }) {
   const cur = options.find((o) => !o.divider && o.value === value) || {};
@@ -344,7 +347,7 @@ function ddOpen(btn) {
   const pop = document.createElement("div");
   pop.className = "dd-pop"; pop.setAttribute("role", "listbox");
   pop.innerHTML = options.map((o) => o.divider ? '<div class="dd-sep" role="separator"></div>'
-    : `<button type="button" role="option" data-v="${esc(o.value)}" aria-selected="${o.value === input.value}" ${o.disabled ? "disabled" : ""}><span class="tick">${o.value === input.value ? TICK : ""}</span>${ddText(o)}</button>`).join("");
+    : `<button type="button" role="option" data-v="${esc(o.value)}" aria-selected="${o.value === input.value}" ${o.disabled ? "disabled" : ""}${o.bg ? ` class="tinted" style="--bg:${o.bg}" title="${esc(o.bgTitle || "")}"` : ""}><span class="tick">${o.value === input.value ? TICK : ""}</span>${ddText(o)}</button>`).join("");
   document.body.appendChild(pop);
   const below = innerHeight - r.bottom - 8, h = Math.min(pop.scrollHeight, 340);
   pop.style.minWidth = Math.max(r.width, 160) + "px";
@@ -1571,21 +1574,22 @@ function riskBody(data, color, plan, result, job) {
   RISK_LINES = {};
   S.paths.forEach((p) => { const t = lineOf(p); if (t.length) RISK_LINES[p.value] = pathLine(p, true); });
   // Worst outcome first: ran short (earliest first), not solved, borderline, then the paths that
-  // lasted from least to most savings left. A lasting path's dot has the tint of the band its
-  // savings left falls in, as on the chart.
+  // lasted from least to most savings left. A lasting path's row has the tint of the band its
+  // savings left falls in, as on the chart; dots stay for ran short and borderline.
   const rank = { short: 0, stuck: 1, edge: 2, ok: 3 };
   const lastYear = (p) => (p.runout && p.runout.lastYear) || 0;
   const order = S.paths.slice().sort((a, b) => rank[kindOf(a)] - rank[kindOf(b)]
     || (kindOf(a) === "short" ? lastYear(a) - lastYear(b) : kindOf(a) === "ok" ? a.bequest - b.bequest : 0) || a.value - b.value);
   const tint = (p) => {
     const q = S.ends.length > 1 ? S.ends.indexOf(p.bequest) / (S.ends.length - 1) : 0.5;
-    return q < 0.1 || q > 0.9 ? [0.16, "Savings left in the outer band (below P10 or above P90)"]
-      : q < 0.25 || q > 0.75 ? [0.35, "Savings left in P10–P90"] : [0.7, "Savings left in P25–P75"];
+    // The chart's band layers stack (0.07, 0.16, 0.32), so each tint is what that band looks like there.
+    return q < 0.1 || q > 0.9 ? [0.07, "Savings left in the outer band (below P10 or above P90)"]
+      : q < 0.25 || q > 0.75 ? [0.22, "Savings left in P10–P90"] : [0.47, "Savings left in P25–P75"];
   };
   const picker = dropdown({ attrs: 'data-act="riskPathPick"', value: sel ? String(sel.value) : "", cls: "field text", label: "Path",
     options: [{ value: "", label: "Pick a path…" }].concat(order.map((p) => {
       const k = kindOf(p), d = dots[k], t = k === "ok" && tint(p);
-      return { value: String(p.value), label: p.label, dot: t ? rgba(color, t[0]) : d && d[0], dotTitle: t ? t[1] : d && d[1] };
+      return { value: String(p.value), label: p.label, dot: d && d[0], dotTitle: d && d[1], bg: t && rgba(color, t[0]), bgTitle: t && t[1] };
     })) });
   const panel = `<div class="rdetail">
       <div class="rdetail-head"><div class="dd-inline">${picker}</div><div class="rline" title="${sel ? esc(pathStatus(sel).replace(/<[^>]+>/g, "")) : ""}">${sel ? pathStatus(sel) : `<span class="muted">${every ? "Click a line on the chart, or pick a path here." : "Pick a path here, or switch to every path and click one."}</span>`}</div>
