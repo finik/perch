@@ -87,7 +87,9 @@ def next_state(plan):
     taxable = plan.b_ijn[:, 0, 1]
     fraction = getattr(plan, "gain_fraction_in", None)
     if fraction is not None and not np.isnan(fraction[:, 1]).any():
-        basis = taxable * (1 - fraction[:, 1])
+        # Owl's gain fraction is of the stock share only (bonds and cash sit at their basis), so
+        # the account's unrealized gain is that fraction times the stock share.
+        basis = taxable * (1 - fraction[:, 1] * plan.alpha_ijkn[:, 0, 0, 1])
     else:
         basis = None
     return {

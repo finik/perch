@@ -297,7 +297,9 @@ def k(dollars) -> str:
 
 
 def mix(stocks, bonds, cash) -> str:
-    notes = max(0.0, 100.0 - num(stocks) - num(bonds) - num(cash))
+    # Owl wants the four shares to add up to 100 as written, so they are rounded first.
+    stocks, bonds, cash = (round(num(v), 1) for v in (stocks, bonds, cash))
+    notes = round(max(0.0, 100.0 - stocks - bonds - cash), 1)
     return f"[ {num(stocks):.1f}, {num(bonds):.1f}, {notes:.1f}, {num(cash):.1f},]"
 
 
@@ -406,6 +408,22 @@ def inputs_of(doc: dict) -> dict:
     return {key: doc.get(key) for key in INPUT_KEYS}
 
 
+GLIDE_CENTER, GLIDE_WIDTH = 15.0, 5.0
+
+
+def glide_share(elapsed: int, years: int) -> float:
+    """How far Owl's s-curve has moved from the mix now toward the mix later after `elapsed` years
+    of a plan `years` long: 0 at the start, 1 at the end (Owl's _tanhInterp, ends matched)."""
+    import math
+    c, w = GLIDE_CENTER, GLIDE_WIDTH + 0.0001
+    grid = lambda i: i * years / max(1, years - 1)  # Owl spaces its points as linspace(0, N, N)
+    th0, thn = math.tanh((0 - c) / w), math.tanh((grid(years - 1) - c) / w)
+    k11, k21, k12, k22 = 0.5 - 0.5 * th0, 0.5 - 0.5 * thn, 0.5 + 0.5 * th0, 0.5 + 0.5 * thn
+    hi = (1 - (k21 / k11) * 0) / (k22 - (k21 / k11) * k12)
+    lo = (0 - k12 * hi) / k11
+    return min(1.0, max(0.0, lo + 0.5 * (hi - lo) * (1 + math.tanh((grid(min(elapsed, years - 1)) - c) / w))))
+
+
 def write_toml(path: Path, spec: dict, stem: str = "scenario") -> None:
     spec = with_household(spec)
     people = spec["people"]
@@ -424,7 +442,16 @@ def write_toml(path: Path, spec: dict, stem: str = "scenario") -> None:
     basis = spec.get("basisNow") or [joint_cost + num(v) for v in spec["ownCost"]]
     pretax = spec.get("pretaxNow") or spec["pretax"]
     roth = spec.get("rothNow") or spec["roth"]
-    now = mix(spec["stocksNow"], spec["bondsNow"], spec["cashNow"])
+    plan_start = int(spec.get("planStart") or NEXT_YEAR)
+    elapsed = start - plan_start
+    stocks, bonds, cash = (num(spec[k + "Now"]) for k in ("stocks", "bonds", "cash"))
+    if elapsed > 0:
+        # A plan restarted in a later year begins where the first plan's glide from the mix now to
+        # the mix later has got to by then, and keeps gliding on the same curve.
+        years = max(int(p["born"]) + int(num(v)) for p, v in zip(people, spec["planTo"])) - plan_start + 1
+        f = glide_share(elapsed, years)
+        stocks, bonds, cash = (v + f * (num(spec[k + "Later"]) - v) for v, k in ((stocks, "stocks"), (bonds, "bonds"), (cash, "cash")))
+    now = mix(stocks, bonds, cash)
     later = mix(spec["stocksLater"], spec["bondsLater"], spec["cashLater"])
     both = f"[ {now}, {later},]"
     if flag(spec.get("useHistoricalRates")):
@@ -482,8 +509,8 @@ obbba_expiration_year = {int(num(spec.get("taxCutsEnd"), 2032))}
 {rates}
 [asset_allocation]
 interpolation_method = "s-curve"
-interpolation_center = {max(0.0, 15.0 - (start - int(spec.get("planStart") or NEXT_YEAR))):.1f}
-interpolation_width = 5.0
+interpolation_center = {GLIDE_CENTER - max(0, elapsed):.1f}
+interpolation_width = {GLIDE_WIDTH:.1f}
 type = "individual"
 generic = {each([both] * count, str)}
 
