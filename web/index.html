@@ -1086,15 +1086,17 @@ function bandsBody(slot) {
 // ---------- risk ----------
 const ANALYSES = [
   ["left", "Savings left at the end"],
+  ["replan", "Year by year, without foresight"],
   ["spend", "Safe spending · Perch"],
   ["owl-frontier", "Safe spending · Owl's frontier"],
   ["regret", "January conversion · Perch quick check"],
   ["owl-regret", "January conversion · Owl's full sweep"],
 ];
-const pathAnalysis = () => UI.riskMeasure === "left" || UI.riskMeasure === "spend";
+const pathAnalysis = () => ["left", "spend", "replan"].includes(UI.riskMeasure);
 function fmtTime(sec) {
   if (sec < 50) return Math.max(5, Math.round(sec / 5) * 5) + " seconds";
   const min = Math.round(sec / 60);
+  if (min >= 90) return "about " + (Math.round(min / 30) / 2) + " hours";
   return min <= 1 ? "about a minute" : min + " minutes";
 }
 // Time on this computer, from the last runs of the same kind (or measurements made while building Perch).
@@ -1105,19 +1107,27 @@ function estimate() {
   if (UI.riskMeasure === "owl-frontier") { seconds = t["owl-frontier"]; detail = `Owl's tool solves ${starts} histories, all of the computer's cores at once.`; }
   else if (UI.riskMeasure === "owl-regret") { seconds = t["owl-regret"]; detail = `Owl's tool: ${starts} hindsight plans, then each history again at 19 locked amounts and once never converting, about ${starts * 21} solves on all cores.`; }
   else if (UI.riskMeasure === "regret") { const n = starts * (CONFIG.regretGrid + 2); seconds = n * t["regret-perch"]; detail = `${starts} hindsight plans plus each history at about ${CONFIG.regretGrid + 1} locked amounts: ${n} solves, ${CONFIG.workers} at a time.`; }
+  else if (UI.riskMeasure === "replan") { const n = UI.riskKind === "history" ? starts : CONFIG.randomPaths; seconds = n * (t.replan || 150); detail = `${n} paths, each lived one year at a time: two or more Owl solves a year, about ${n * years * 2} in all, ${CONFIG.workers} paths at a time.`; }
   else { const n = UI.riskKind === "history" ? starts : CONFIG.randomPaths; seconds = n * t.paths; detail = `${n} paths, one Owl solve each, ${CONFIG.workers} at a time.`; }
   const text = fmtTime(seconds);
   return { seconds, text, detail: `${text.startsWith("about") ? text[0].toUpperCase() + text.slice(1) : "About " + text}. ${detail}` };
 }
 function howPanel(first) {
   const doc = SLOTS[UI.riskSlot].doc, market = (CONFIG.riskModels.find((m) => m[0] === UI.riskKind) || [])[2] || "";
-  const common = "Owl plans each history knowing its markets in advance, so it shows the best that could be done in it; real life will not time things this well. Social Security starts at the ages Owl chose for the plan.";
+  const common = UI.riskMeasure === "replan" ? "No foresight: each January's plan knows only the past. Social Security starts at the ages Owl chose for the plan. A year's moves are decided before its market is known, except how much is taken from which account, which Owl settles with that year's market."
+    : "Owl plans each history knowing its markets in advance, so it shows the best that could be done in it; real life will not time things this well. Social Security starts at the ages Owl chose for the plan.";
   const H = {
     left: {
       q: "Does the money last to the end of the plan, and how much is left?",
       how: [`Perch picks a set of market paths: ${UI.riskKind === "history" ? `every 52-year stretch of real history, starting each year from ${first} until history runs out` : "the market choice below"}.`, "Owl plans the scenario once on each path, exactly as in View, with that path's returns.", "Perch counts the paths that pay for everything, those that run short, and those Owl answers only roughly (borderline), and draws net worth over the years."],
       see: "How many paths lasted, savings left at the median and P10, the lowest net worth, net worth by year as a band or as every path, and the picked path in full.",
       who: "Each solve is Owl's. Choosing the paths and adding up the results is Perch's.",
+    },
+    replan: {
+      q: "How does the plan hold up when you do not know what the markets will do?",
+      how: [`Perch picks a set of market paths: ${UI.riskKind === "history" ? `every 52-year stretch of real history, starting each year from ${first} until history runs out` : "the market choice below"}.`, "Each path is lived one year at a time. Every January Owl plans the rest of the plan from that day's savings, assuming average markets from then on, and that plan's moves for the year are made.", "If average markets would no longer pay for everything, that year's gift is skipped. If that is not enough, that year's spending is cut to what average markets can carry. The full plan comes back as soon as it fits again.", "Then the year happens with the path's real market, and the next January starts from the savings it left."],
+      see: "How many paths never had to cut back, how many ran out anyway, years without the gift, the lowest spending in any year, and each path in full with its skipped gifts and cuts.",
+      who: "Each yearly plan is Owl's. Living the years, the gift and spending rule, and the counting are Perch's.",
     },
     spend: {
       q: "How much could we spend every year and still last?",
@@ -1173,14 +1183,15 @@ function riskHover(v) {
   if (!html) return;
   svg.querySelector("#fan-cursor").insertAdjacentHTML("beforebegin", `<g id="hover-path" pointer-events="none">${html}</g>`);
 }
-const riskLife = () => UI.riskLife === "1" && UI.riskKind !== "history";
+const riskLife = () => UI.riskLife === "1" && UI.riskKind !== "history" && UI.riskMeasure !== "replan";
 const riskKey = () => UI.riskMeasure === "regret" ? SLOTS[UI.riskSlot].doc.id + "|regret"
   : UI.riskMeasure.startsWith("owl-") ? SLOTS[UI.riskSlot].doc.id + "|" + UI.riskMeasure
+  : UI.riskMeasure === "replan" ? SLOTS[UI.riskSlot].doc.id + "|" + UI.riskKind + "|0|0|replan"
   : SLOTS[UI.riskSlot].doc.id + "|" + UI.riskKind + "|" + (riskLife() ? "1" : "0") + "|" + (UI.riskMeasure === "spend" ? "1" : "0");
 const riskUrl = (key) => {
   if (key.endsWith("|regret")) return `/api/scenarios/${key.split("|")[0]}/regret`;
   if (key.includes("|owl-")) { const [id, tool] = key.split("|"); return `/api/scenarios/${id}/owl/${tool.slice(4)}`; }
-  const [id, kind, life, spend] = key.split("|"), q = [life === "1" && "life=1", spend === "1" && "spend=1"].filter(Boolean);
+  const [id, kind, life, spend, replan] = key.split("|"), q = [life === "1" && "life=1", spend === "1" && "spend=1", replan && "replan=1"].filter(Boolean);
   return `/api/scenarios/${id}/risk/${kind}${q.length ? "?" + q.join("&") : ""}`;
 };
 // Each run is polled under its own key, one timer per key, until it finishes; switching away
@@ -1262,7 +1273,7 @@ function renderRisk() {
   const head = `<div class="tools">
       <div class="dd-inline wide">${dropdown({ attrs: 'data-act="riskMeasure"', value: UI.riskMeasure, cls: "field text", label: "Analysis", options: ANALYSES.map(([value, label]) => ({ value, label })) })}</div>
       ${!pathAnalysis() ? `<span class="muted small">Real history</span>` : `<div class="dd-inline">${dropdown({ attrs: 'data-act="riskKind"', value: UI.riskKind, cls: "field text", label: "Markets", options: CONFIG.riskModels.map(([value, label]) => ({ value, label })) })}</div>
-      ${UI.riskKind === "history" ? "" : seg([["0", "Live to the plan's ages"], ["1", "Lifespans from life tables"]], "riskLife")}`}
+      ${UI.riskKind === "history" || UI.riskMeasure === "replan" ? "" : seg([["0", "Live to the plan's ages"], ["1", "Lifespans from life tables"]], "riskLife")}`}
       <span class="muted small" style="margin-left:auto">${st && st.result ? `Ran ${esc(st.result.ranAt)}${st.result.paths ? ` · ${st.result.paths.length} paths` : ""}` : ""}</span>
       ${st && st.result && !riskBusy(st) && (st.stale || oldRun(st.result)) ? `<button type="button" data-act="riskRun">Run again · ${esc(estimate().text)}</button>` : ""}
     </div>
@@ -1451,23 +1462,47 @@ function spendBody(data, color, doc) {
     <svg class="chart" viewBox="0 0 ${BW} ${BH}" role="img" aria-label="The most each path can spend every year">${bars}</svg>${detail}`;
 }
 // What one path came to, in one line for the panel under the chart.
+// What a path lived without foresight gave up: skipped gifts and spending cuts.
+function replanText(p) {
+  const skipped = p.replan.filter((y) => y.planned > 0 && !y.gift), cut = p.replan.filter((y) => y.cut === "cut");
+  const span = (ys) => ys.length ? (ys[0].year === ys[ys.length - 1].year ? ys[0].year : ys[0].year + "–" + ys[ys.length - 1].year) : "";
+  let out = "";
+  if (skipped.length) out += ` · gift skipped in <b>${skipped.length}</b> ${skipped.length === 1 ? "year" : "years"} (${span(skipped)})`;
+  if (cut.length) { const low = cut.reduce((m, y) => (y.spend < m.spend ? y : m), cut[0]); out += ` · spending cut in <b>${cut.length}</b> ${cut.length === 1 ? "year" : "years"}, lowest <b class="mono">${money(low.spend)}</b> in ${low.year}`; }
+  return out;
+}
 function pathStatus(p) {
   if (!p) return "";
   const lives = p.lifespans && riskLife() ? " · " + people().map((x, i) => esc(x.name) + " lives to " + p.lifespans[i]).join(", ") : "";
   if (p.solved && p.convergence === "unsolvable iterate") return `<span class="edge">Borderline</span>: the money just about lasts or runs short in these markets, and Owl could not settle which${lives}`;
+  if (p.solved && p.replan) return `Savings left at the end <b class="mono">${money(p.bequest)}</b>${replanText(p) || " · never had to cut back"}`;
   if (p.solved) {
     const low = p.timeline.reduce((m, r) => (r.worth < m.worth ? r : m), p.timeline[0]);
     return `Savings left at the end <b class="mono">${money(p.bequest)}</b> · lowest net worth <b class="mono">${money(low.worth)}</b> in ${low.year} · tax over the plan <b class="mono">${money(p.timeline.reduce((t, r) => t + r.tax, 0))}</b>${lives}`;
   }
   if (!p.short) return "Owl could not solve this path";
+  if (p.replan) return `<span class="short">Ran out</span> in ${p.ranOut}: even spending nothing beyond the fixed costs no longer fit${replanText(p)}`;
   return `<span class="short">Ran short</span> ${runoutText(p)}`;
 }
 
 // A path's years as the View tab reads a plan: Owl's full yearly numbers, with the scenario's
 // spending bands, and prices growing as that path's own inflation did.
 function pathRows(p, doc) {
-  const full = p && (p.solved ? p.rows : p.runout && p.runout.rows);
-  if (!full) return null;
+  const full = p && (p.replan ? p.rows : p.solved ? p.rows : p.runout && p.runout.rows);
+  if (!full || !full.length) return null;
+  if (p.replan) {
+    // The gifts this path skipped are left out of its years, as they were not given.
+    const skipped = p.replan.filter((y) => y.planned > 0 && !y.gift).map((y) => y.year);
+    const bands = [];
+    (doc.spendingBands || []).forEach((b) => {
+      if (b.kind !== "gift") { bands.push(b); return; }
+      let from = b.from;
+      for (let yr = b.from; yr <= b.to + 1; yr++) {
+        if (yr > b.to || skipped.includes(yr)) { if (yr > from) bands.push(Object.assign({}, b, { from, to: yr - 1 })); from = yr + 1; }
+      }
+    });
+    doc = Object.assign({}, doc, { spendingBands: bands });
+  }
   const inf = (p.returns || []).map((r) => r[4] / 100), inflation = inf.length ? Math.pow(inf.reduce((t, v) => t * (1 + v), 1), 1 / inf.length) - 1 : undefined;
   return rowsOf(Object.assign({}, doc, { result: { timeline: full, inflation } }));
 }
@@ -1510,17 +1545,31 @@ function pathFull(sel, doc) {
     <div class="pfull-body"><div>${svg}</div><aside id="path-card">${pathCard(rows)}</aside></div></div>`;
 }
 
+// Without foresight: how many paths never cut back, years without the gift, the lowest spending.
+function replanStats(S) {
+  const never = S.paths.filter((p) => p.solved && p.replan && !p.replan.some((y) => y.cut !== "full")).length;
+  const gifts = S.paths.map((p) => (p.replan || []).filter((y) => y.planned > 0 && !y.gift).length).filter((k) => k > 0).sort((a, b) => a - b);
+  let low = null;
+  S.paths.forEach((p) => (p.replan || []).forEach((y) => { if (y.cut === "cut" && (!low || y.spend < low.spend)) low = { spend: y.spend, year: y.year, label: p.label }; }));
+  return { never, out: S.short.length, gifts, giftMedian: gifts.length ? gifts[Math.floor(gifts.length / 2)] : 0, giftMax: gifts.length ? gifts[gifts.length - 1] : 0, low };
+}
 // Savings left: net worth across the paths, as a band or as every path; the picked path's
 // markets and numbers in a panel of fixed size underneath, so picking moves nothing.
 function riskBody(data, color, plan, result, job) {
   const S = riskStats(data), n = S.paths.length, lasted = S.ok.length;
   const sel = S.paths.find((p) => p.value === UI.riskPath), every = UI.riskView === "paths";
-  const tiles = [
+  const R = data.replan ? replanStats(S) : null;
+  const tiles = (R ? [
+    ["Never cut back", `${R.never} of ${n}`, R.out ? `${R.out} ran out even after cutting back` : "None ran out"],
+    ["Years without the gift", R.gifts.length ? `${R.giftMedian}` : "0", R.gifts.length ? `Median of the ${R.gifts.length} paths that skipped any; most on one path: ${R.giftMax}` : "Every gift was given"],
+    ["Lowest spending in a year", R.low ? money(R.low.spend) : money(data.netSpending), R.low ? `${esc(R.low.label)}, in ${R.low.year}` : "Spending was never cut"],
+    ["Savings left, median", money(quantile(S.ends, 0.5)), `Paths that never ran out · average markets: ${money(result.bequest)}`],
+  ] : [
     ["Lasted", `${lasted} of ${n}`, [S.short.length && `${S.short.length} ran short`, S.borderline.length && `${S.borderline.length} borderline`, S.stuck.length && `Owl could not solve ${S.stuck.length}`].filter(Boolean).join(" · ") || "Every path paid for everything"],
     ["Savings left, median", money(quantile(S.ends, 0.5)), `Average markets: ${money(result.bequest)}`],
     ["Savings left, P10", money(quantile(S.ends, 0.1)), "90% of lasting paths end above this"],
     ["Lowest net worth on any path", S.low ? money(S.low.worth) : "—", S.low ? `${esc(S.low.path.label)}, in ${S.low.year}` : ""],
-  ].map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
+  ]).map(([t, v, sub]) => `<div class="tile"><div class="muted small">${t}</div><div class="big mono">${v}</div><div class="muted small">${sub}</div></div>`).join("");
 
   // Net worth, log scale. Axis and scale are set once from every path, so nothing moves on a pick.
   const W = 1200, H = 290, L = 64, Rr = 12, T = 10, B = 28, pw = W - L - Rr, ph = H - T - B;
@@ -1565,7 +1614,7 @@ function riskBody(data, color, plan, result, job) {
     : todo.length ? `<button type="button" class="rbtn" data-act="runoutAll">${todo.length} ${todo.length === 1 ? "path that ran short is" : "paths that ran short are"} not on the chart yet · Find when the money runs out · ${fmtTime(Math.ceil(todo.length / CONFIG.workers) * CONFIG.timings.runout)}</button>`
     : job && job.error ? `<span class="rbtn short small">${esc(job.error)}</span>` : "";
   const legend = `<div class="legend" style="margin-left:0">${every ? `<span><i class="ln" style="border-color:${color}"></i>A path that lasted</span>` : `<span><i class="sw" style="background:${color};opacity:.16"></i>P0–P100, every path</span><span><i class="sw" style="background:${color};opacity:.35"></i>P10–P90</span><span><i class="sw" style="background:${color};opacity:.7"></i>P25–P75</span><span><i class="ln" style="border-color:${color}"></i>Median</span>`}
-    <span><i class="ln" style="border-color:#e5484d"></i>Ran short (${S.short.length})</span><span><i class="ln" style="border-color:#d9a13b"></i>Borderline (${S.borderline.length})</span><span><i class="ln dash"></i>Average markets</span>
+    <span><i class="ln" style="border-color:#e5484d"></i>${data.replan ? "Ran out" : "Ran short"} (${S.short.length})</span>${data.replan ? "" : `<span><i class="ln" style="border-color:#d9a13b"></i>Borderline (${S.borderline.length})</span>`}<span><i class="ln dash"></i>Average markets</span>
     ${riskLife() ? `<span class="muted">With life-table lifespans paths end in different years; the band covers the paths still running</span>` : ""}</div>`;
 
   // The panel under the chart: same size whether or not a path is picked.

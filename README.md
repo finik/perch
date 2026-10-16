@@ -92,7 +92,8 @@ runs. Results are kept until the plan changes.
 
 | Analysis | The question | Method |
 |---|---|---|
-| Savings left at the end | Does the money last, and how much is left? | One Owl solve per path |
+| Savings left at the end | Does the money last, and how much is left? | One Owl solve per path, knowing that path's markets in advance |
+| Year by year, without foresight | How does the plan hold up when you don't know what markets will do? | Each path lived one year at a time: every January Owl re-plans assuming average markets; if that no longer pays for everything, that year's gift is skipped, then spending is cut to what average markets carry, until the plan fits again. Slow: a couple of hours for real history |
 | Safe spending · Perch | How much could we spend every year and still last? | Owl finds the most each path can spend; Perch counts the paths that afford each level |
 | Safe spending · Owl's frontier | The same, with the chance and size of a shortfall | Owl's own spending optimization, unchanged |
 | January conversion · quick check | How much does this January's Roth conversion matter? | Each history solved with hindsight, then with the first conversion locked at a range of amounts |
@@ -106,6 +107,10 @@ runs. Results are kept until the plan changes.
   it lived through (stocks and inflation each year, average, best and worst years) and the path in
   full, as View shows a plan: savings by account or spending by kind each year, and the numbers
   for the year under the pointer. These sit under the chart and keep their place.
+- **Without foresight:** how many paths never had to cut back, how many ran out anyway, years
+  without the gift, and the lowest spending in any year; each path shows its skipped gifts and cuts.
+- **Owl's solver:** when HiGHS stops without an answer on a plan that cannot be paid for, Perch
+  solves it again with HiGHS's interior-point method, which gives the answer.
 - **Paths that run short:** one button on the chart finds, for all of them at once, the last year
   each still pays for everything, with a time estimate.
 
@@ -175,6 +180,7 @@ scenario of a household; the results show on the page as if run there.
 ```sh
 python3 perch.py run alex-and-sam/retire-now history random runout
 python3 perch.py run alex-and-sam spend owl-frontier
+python3 perch.py run alex-and-sam/retire-now replan   # without foresight (random-replan for random history)
 python3 perch.py run --help        # the list of analyses
 ```
 

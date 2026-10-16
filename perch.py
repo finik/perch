@@ -659,11 +659,26 @@ def market_path(kind: str, value: int, years: int) -> list:
     return [r[1:] for r in history_rows() if value <= r[0] < value + years]
 
 
+_OWL_VERSION: str | None = None
+
+
+def owl_version() -> str:
+    """The Owl commit Perch runs: results from another Owl are out of date."""
+    global _OWL_VERSION
+    if _OWL_VERSION is None:
+        try:
+            _OWL_VERSION = subprocess.run(["git", "-C", str(OWL), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            _OWL_VERSION = ""
+    return _OWL_VERSION
+
+
 def fingerprint(doc: dict) -> str:
-    """Changes whenever anything Owl would see changes: the inputs, the people, or the plan it chose."""
+    """Changes whenever anything Owl would see changes: the inputs, the people, the plan it chose,
+    or Owl itself."""
     spec = with_household(doc)
     seen = {"inputs": inputs_of(doc), "people": spec["people"], "state": spec.get("state"),
-            "ssAges": (doc.get("result") or {}).get("ssAges")}
+            "ssAges": (doc.get("result") or {}).get("ssAges"), "owl": owl_version()}
     return hashlib.sha256(json.dumps(seen, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -755,6 +770,253 @@ def run_risk(ident: str, kind: str, life: bool, spend: bool, job: dict) -> dict:
     return {"kind": kind, "life": life, "spend": spend, "netSpending": doc.get("netSpending"), "fingerprint": fingerprint(doc), "ranAt": time.strftime("%Y-%m-%d %H:%M"),
             "runId": f"{time.time():.6f}",
             "history": [first, last], "years": years, "ssAges": result.get("ssAges"), "paths": paths}
+
+
+# ---------- Risk without foresight: re-plan every January ----------
+# Each path is lived one year at a time. Every January Owl plans the rest of the plan from that
+# day's balances assuming average markets (it does not know the path's future), and that plan's
+# moves for the year are made. Then the year happens with the path's real market and its
+# balances carry on. When average markets would no longer pay for everything, this year's gift
+# is skipped; if that is not enough, this year's spending is cut to what average markets can
+# carry, gifts included in the cut. The full plan comes back as soon as it fits again.
+PER_PERSON = [f["key"] for f in FIELDS if f.get("perPerson")]
+
+
+def replan_file(ident: str, kind: str) -> Path:
+    return risk_dir(ident) / f"{kind}-replan.json"
+
+
+def average_rates() -> list:
+    """Average markets, as a planner without foresight assumes them: the yearly geometric mean of
+    Owl's history of stocks, bonds, notes and inflation, in percent."""
+    rows = history_rows()
+    out = []
+    for k in range(1, 5):
+        g = 1.0
+        for r in rows:
+            g *= 1 + r[k] / 100
+        out.append((g ** (1 / len(rows)) - 1) * 100)
+    return out
+
+
+def alive(spec: dict, year: int) -> list:
+    """Who a plan restarted in that year still runs for: each plan ends at the person's plan-to age."""
+    return [i for i, p in enumerate(spec["people"]) if int(p["born"]) + int(num(spec["planTo"][i])) >= year]
+
+
+def restart_spec(spec: dict, year: int, state: dict, price: float, bands: list, **extra) -> dict:
+    """The scenario restarted on 1 January of a later year, in today's dollars. After a death the
+    survivor holds everything, as one person's plan, and keeps the larger Social Security check."""
+    out = dict(spec, startYear=year, priceFactor=1.0, deflator=price, spendingBands=bands, **state, **extra)
+    keep = alive(spec, year)
+    if len(keep) < len(spec["people"]):
+        for key in PER_PERSON:
+            if isinstance(spec.get(key), list):
+                out[key] = [spec[key][i] for i in keep]
+        out["people"] = [spec["people"][i] for i in keep]
+        out["status"] = "single"
+        out["ssMonthly"] = [max(num(v) for v in spec["ssMonthly"])]
+    return out
+
+
+def gift_in(bands: list, year: int) -> float:
+    return sum(num(b["amount"]) for b in bands if b.get("kind") == "gift" and int(b["from"]) <= year <= int(b["to"]))
+
+
+def without_gifts(bands: list, first: int, last: int) -> list:
+    """The bands with every gift left out from first to last."""
+    out = []
+    for b in bands:
+        if b.get("kind") != "gift" or int(b["to"]) < first or int(b["from"]) > last:
+            out.append(b)
+            continue
+        if int(b["from"]) < first:
+            out.append(dict(b, to=first - 1))
+        if int(b["to"]) > last:
+            out.append(dict(b, **{"from": last + 1}))
+    return out
+
+
+def build_case(folder: Path, spec: dict) -> None:
+    write_toml(folder / "scenario.toml", spec)
+    (folder / "spec.json").write_text(json.dumps(spec))
+    built = subprocess.run([str(PYTHON), str(BUILD_HFP), str(folder / "spec.json"), str(folder / "scenario.xlsx")], capture_output=True, text=True)
+    if built.returncode != 0:
+        raise RuntimeError((built.stderr or "workbook failed")[-2000:])
+
+
+def solve_case(folder: Path, year: int, overrides: dict) -> dict | None:
+    """Owl's plan for the case in folder, or None when no plan pays for everything."""
+    over, out = folder / "in.json", folder / "out.json"
+    out.unlink(missing_ok=True)
+    over.write_text(json.dumps(dict(overrides, maxTime=PATH_SOLVE_SECONDS)))
+    env = dict(os.environ, OWL_START_YEAR=str(year), OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+    proc = solve_path([str(PYTHON), str(SOLVE_RICH), str(folder / "scenario.toml"), str(out), str(over)], env)
+    if proc.returncode != 0 or not out.exists():
+        return None
+    return json.loads(out.read_text())
+
+
+def replan_market(folder: Path, spec: dict, kind: str, value: int, years: int, start: int) -> list:
+    """The path's yearly returns: real history, or what Owl's market model draws for this seed."""
+    if kind == "history":
+        return market_path("history", value, years)
+    build_case(folder, spec)
+    market, _ = path_setup(kind, value, years, False)
+    over, out = folder / "in.json", folder / "out.json"
+    over.write_text(json.dumps(dict(market, returnsOnly=True)))
+    env = dict(os.environ, OWL_START_YEAR=str(start), OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+    solve_path([str(PYTHON), str(SOLVE_RICH), str(folder / "scenario.toml"), str(out), str(over)], env)
+    rows = json.loads(Path(str(out) + ".returns.json").read_text())
+    return [r[1:] for r in rows][:years]
+
+
+def replan_path(spec0: dict, kind: str, value: int, years: int, start: int, avg: list) -> dict:
+    label = path_setup(kind, value, years, False)[1]
+    count = len(spec0["people"])
+    state = {"taxableNow": [num(spec0.get("jointValue")) / count + num(v) for v in spec0["ownValue"]],
+             "basisNow": [num(spec0.get("jointCost")) / count + num(v) for v in spec0["ownCost"]],
+             "pretaxNow": [num(v) for v in spec0["pretax"]], "rothNow": [num(v) for v in spec0["roth"]]}
+    bands, net = list(spec0.get("spendingBands") or []), num(spec0.get("netSpending"))
+    price, rows, years_done, ran_out, last = 1.0, [], [], None, None
+    with tempfile.TemporaryDirectory(prefix="perch-replan-") as folder:
+        folder = Path(folder)
+        own = replan_market(folder, restart_spec(spec0, start, state, price, bands), kind, value, years, start)
+        # Owl needs two years to plan, so the last January is not re-planned.
+        for t in range(years - 1):
+            year, left = start + t, years - t
+            if len(alive(spec0, year)) < len(state["taxableNow"]):
+                state = {k: [sum(v)] for k, v in state.items()}
+            planned = gift_in(bands, year)
+            ahead = [avg] * left
+            # The plan as written, if average markets from here pay for it.
+            spec = restart_spec(spec0, year, state, price, bands)
+            build_case(folder, spec)
+            plan, choice = solve_case(folder, year, {"rates": ahead}), "full"
+            if plan is None and planned > 0:
+                spec = restart_spec(spec0, year, state, price, without_gifts(bands, year, year))
+                build_case(folder, spec)
+                plan, choice = solve_case(folder, year, {"rates": ahead}), "noGift"
+            if plan is None:
+                # Spend this year what average markets can carry, with no gifts from here on.
+                spec = restart_spec(spec0, year, state, price, without_gifts(bands, year, 9999), bequestFloor=0)
+                build_case(folder, spec)
+                most = solve_case(folder, year, {"rates": ahead, "objective": "maxSpending"})
+                if most is None:
+                    ran_out = year
+                    break
+                spec = restart_spec(spec0, year, state, price, without_gifts(bands, year, 9999), bequestFloor=0,
+                                    netSpending=min(net, num(most.get("spending"))))
+                build_case(folder, spec)
+                plan, choice = solve_case(folder, year, {"rates": ahead}) or most, "cut"
+            # The year happens with the path's own market, this January's conversion as planned.
+            lived = [own[t]] + [avg] * (left - 1)
+            moved = (plan.get("next") or {}).get("conversions")
+            real = solve_case(folder, year, {"rates": lived, "fixedRoth": moved}) if moved else None
+            real = real or solve_case(folder, year, {"rates": lived})
+            if real is None:
+                # This year's market leaves too little for the year as planned: spend what it can carry.
+                spec = restart_spec(spec0, year, state, price, without_gifts(bands, year, 9999), bequestFloor=0)
+                build_case(folder, spec)
+                real, choice = solve_case(folder, year, {"rates": lived, "objective": "maxSpending"}), "cut"
+                if real is None:
+                    ran_out = year
+                    break
+                if num(real.get("spending")) >= net:
+                    # Dropping the gifts is enough: spend what the plan says, no more.
+                    spec = restart_spec(spec0, year, state, price, without_gifts(bands, year, 9999), bequestFloor=0, netSpending=net)
+                    build_case(folder, spec)
+                    real = solve_case(folder, year, {"rates": lived}) or real
+            row = full_rows(real["timeline"])[0]
+            if choice == "cut" and row["spending"] >= net - 1:
+                # Dropping the gifts was enough: spending stayed whole this year.
+                choice = "noGift"
+            rows.append(row)
+            years_done.append({"year": year, "spend": row["spending"], "gift": planned if choice == "full" else 0,
+                               "planned": planned, "cut": choice})
+            last = real
+            nxt = real.get("next")
+            if not nxt:
+                break
+            # Next January's balances come back in this year's dollars; bring them to today's.
+            grown = 1 + own[t][3] / 100
+            nxt = {k: [x / grown for x in nxt[k]] if nxt[k] else None for k in ("taxable", "basis", "pretax", "roth")}
+            basis = nxt["basis"] or [b * x / max(o, 1) for b, x, o in zip(state["basisNow"], nxt["taxable"], state["taxableNow"])]
+            state = {"taxableNow": nxt["taxable"], "basisNow": [min(b, x) for b, x in zip(basis, nxt["taxable"])],
+                     "pretaxNow": nxt["pretax"], "rothNow": nxt["roth"]}
+            price *= grown
+        if ran_out is None and last is not None and len(last["timeline"]) > 1:
+            # The last January: its balances are real; its moves are not re-planned.
+            rows.append(dict(full_rows(last["timeline"])[1], final=True))
+    returns = [[start + k] + list(r) for k, r in enumerate(own)]
+    timeline = [{"year": r["year"], "worth": round(r["taxable"] + r["pretax"] + r["roth"] + r["realEstate"] - r["debt"]),
+                 "tax": r["tax"], "conv": r["rothMoved"]} for r in rows]
+    path = {"value": value, "label": label, "returns": returns, "rows": rows, "replan": years_done, "ranOut": ran_out}
+    if ran_out is None:
+        last_row = rows[-1] if rows else {"taxable": 0, "pretax": 0, "roth": 0}
+        return dict(path, solved=True, bequest=round(last_row["taxable"] + last_row["pretax"] + last_row["roth"]), timeline=timeline)
+    return dict(path, solved=False, short=True, timeline=[], runout={"lastYear": ran_out - 1, "timeline": timeline})
+
+
+def run_replan(ident: str, kind: str, job: dict) -> dict:
+    doc = read_doc(scenario_file(ident))
+    result = doc.get("result") or {}
+    years = len(result.get("timeline") or [])
+    if not years:
+        raise RuntimeError("Solve the scenario first.")
+    spec = with_household(doc)
+    if spec.get("chooseSsAges") and result.get("ssAges"):
+        spec = dict(spec, chooseSsAges=False, ssAge=result["ssAges"])
+    start = int(spec.get("planStart") or NEXT_YEAR)
+    first, last = int(history_rows()[0][0]), int(history_rows()[-1][0])
+    values = list(range(first, last - years + 2)) if kind == "history" else list(range(1, RANDOM_PATHS + 1))
+    job["total"] = len(values)
+    avg = average_rates()
+
+    def one(value: int) -> dict:
+        try:
+            path = replan_path(spec, kind, value, years, start, avg)
+        except Exception as exc:  # one path's failure is shown with it, not the whole run's
+            path = {"value": value, "label": path_setup(kind, value, years, False)[1], "solved": False, "short": False,
+                    "error": str(exc)[-600:], "timeline": [], "replan": []}
+        with JOBS_LOCK:
+            job["done"] += 1
+        return path
+
+    with ThreadPoolExecutor(RISK_WORKERS) as pool:
+        paths = list(pool.map(one, values))
+    return {"kind": kind, "life": False, "spend": False, "replan": True, "netSpending": doc.get("netSpending"),
+            "fingerprint": fingerprint(doc), "ranAt": time.strftime("%Y-%m-%d %H:%M"), "runId": f"{time.time():.6f}",
+            "history": [first, last], "years": years, "ssAges": result.get("ssAges"), "average": avg, "paths": paths}
+
+
+def start_replan(ident: str, kind: str) -> dict:
+    key = (ident, kind, False, "replan")
+    with JOBS_LOCK:
+        if key in JOBS and JOBS[key].get("running"):
+            return JOBS[key]
+        job = JOBS[key] = {"running": True, "done": 0, "total": 0, "error": "", "began": time.time()}
+
+    def work():
+        try:
+            data = run_replan(ident, kind, job)
+            record_timing("replan", time.time() - job["began"], len(data["paths"]))
+            with RISK_FILE_LOCK:
+                write_json(replan_file(ident, kind), data)
+        except Exception as exc:  # the page shows it
+            job["error"] = str(exc)[-1000:]
+        job["running"] = False
+
+    threading.Thread(target=work, daemon=True).start()
+    return job
+
+
+def replan_state(ident: str, kind: str) -> dict:
+    file = replan_file(ident, kind)
+    data = json.loads(file.read_text()) if file.exists() else None
+    current = fingerprint(read_doc(scenario_file(ident)))
+    return {"kind": kind, "life": False, "spend": False, "replan": True, "job": JOBS.get((ident, kind, False, "replan")),
+            "result": data, "stale": bool(data) and data.get("fingerprint") != current, "workers": RISK_WORKERS}
 
 
 def find_runout(ident: str, kind: str, life: bool, value: int) -> dict:
@@ -1073,7 +1335,7 @@ def owl_tool_state(ident: str, tool: str) -> dict:
 # ---------- how long an analysis takes on this computer ----------
 # Seconds per run (Owl's tools) or per path (Perch's runs), from the last runs here; until a run
 # has happened, from runs measured while building Perch.
-TIMINGS_DEFAULT = {"paths": 1.6, "regret-perch": 0.95, "owl-frontier": 25.0, "owl-regret": 870.0, "runout": 15.0}
+TIMINGS_DEFAULT = {"replan": 150.0, "paths": 1.6, "regret-perch": 0.95, "owl-frontier": 25.0, "owl-regret": 870.0, "runout": 15.0}
 
 
 def timings_file() -> Path:
@@ -1218,6 +1480,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(404, {"error": "not found"})
                 return
             query = urlparse(self.path).query
+            if "replan=1" in query:
+                self._send(200, replan_state(ident, kind))
+                return
             self._send(200, risk_state(ident, kind, "life=1" in query, "spend=1" in query))
             return
         if rest == ["export"]:
@@ -1354,6 +1619,10 @@ class Handler(BaseHTTPRequestHandler):
             life, spend = "life=1" in urlparse(self.path).query, "spend=1" in urlparse(self.path).query
             if scenario_file(ident) is None or not scenario_file(ident).exists() or kind not in RISK_KINDS:
                 self._send(404, {"error": "not found"})
+                return
+            if "replan=1" in urlparse(self.path).query:
+                start_replan(ident, kind)
+                self._send(202, replan_state(ident, kind))
                 return
             if life and kind == "history":
                 self._send(400, {"error": "Real history is too short for drawn lifespans; pick a market model."})
@@ -1594,7 +1863,7 @@ CLI_ANALYSES = {
     "random-life": ("risk", "random", True, False), "garch_dcc": ("risk", "garch_dcc", False, False),
     "garch_dcc-life": ("risk", "garch_dcc", True, False), "spend": ("risk", "history", False, True),
     "regret": ("regret",), "owl-frontier": ("owl", "frontier"), "owl-regret": ("owl", "regret"),
-    "runout": ("runout",),
+    "runout": ("runout",), "replan": ("replan", "history"), "random-replan": ("replan", "random"),
 }
 
 
@@ -1634,6 +1903,8 @@ def cli_run(args: list) -> None:
             how = CLI_ANALYSES[name]
             if how[0] == "risk":
                 wait(start_risk(ident, *how[1:]), name)
+            elif how[0] == "replan":
+                wait(start_replan(ident, how[1]), name)
             elif how[0] == "regret":
                 wait(start_regret(ident), name)
             elif how[0] == "owl":

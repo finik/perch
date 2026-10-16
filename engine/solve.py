@@ -8,23 +8,13 @@ import sys
 
 import clock  # noqa: F401  must come before Owl: date.today() is the plan's first 1 January
 
-import highspy
+import highs_setup
 import numpy as np
 import pandas as pd
 
-_Highs = highspy.Highs
-
-
-class OneThreadHighs(_Highs):
-    """Many solves run side by side; one solver thread each keeps the cores from thrashing."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setOptionValue("threads", 1)
-
-
-highspy.Highs = OneThreadHighs
-from owlplanner.config import readConfig
+# Many solves run side by side; one solver thread each keeps the cores from thrashing.
+highs_setup.setup(one_thread=True)
+from owlplanner.config import readConfig  # noqa: E402
 
 
 def top_rate(filled, rates):
@@ -109,7 +99,10 @@ def main():
             # The market this path lives through, kept even if no plan pays for everything in it:
             # each year's return on stocks, corporate bonds and T-notes, and inflation, in percent.
             with open(sys.argv[2] + ".returns.json", "w") as handle:
-                json.dump([[int(plan.year_n[n])] + [round(float(v) * 100, 2) for v in plan.tau_kn[:, n]] for n in range(plan.N_n)], handle)
+                json.dump([[int(plan.year_n[n])] + [round(float(v) * 100, 4) for v in plan.tau_kn[:, n]] for n in range(plan.N_n)], handle)
+            if overrides.get("returnsOnly"):
+                # Only the market is wanted: the year-by-year re-planning lives it a year at a time.
+                return
         options = dict(plan.solverOptions)
         options["solver"] = "HiGHS"
         options.update(extra)

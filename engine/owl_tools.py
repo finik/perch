@@ -16,8 +16,11 @@ import json
 import sys
 
 import clock  # noqa: F401  must come before Owl
+import highs_setup
 
 import numpy as np
+
+highs_setup.setup(one_thread=False)
 
 from owlplanner import stresstests
 from owlplanner.config import readConfig
