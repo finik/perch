@@ -13,8 +13,8 @@ PLAN = int(spec["planStart"])
 START = int(spec.get("startYear") or PLAN)
 PRICE = float(spec.get("priceFactor") or 1.0)
 # A plan restarted in a later year runs in today's dollars, because Owl's tax brackets are this
-# year's. Amounts fixed in dollars of their own year (the mortgage, house prices) shrink by the
-# inflation that has happened since.
+# year's. Amounts fixed in dollars of their own year (the mortgage, a property's cost basis) shrink
+# by the inflation that has happened since. A property's value does not: Owl grows it with prices.
 DEFLATE = float(spec.get("deflator") or 1.0)
 HEALTH = float(spec.get("healthAbove") or 0) / 100
 COLLEGE = float(spec.get("collegeAbove") or 0) / 100
@@ -105,5 +105,5 @@ for prop in spec.get("properties") or []:
         debts.append([True, f"{prop['name']} mortgage", "mortgage", PLAN, int(prop["years"]),
                       round(float(prop["mortgage"]) / DEFLATE), float(prop.get("rate") or 0), prop["name"]])
     assets.append([True, prop["name"], kind, PLAN, round(float(prop.get("cost") or 0) / DEFLATE),
-                   round(float(prop.get("value") or 0) / DEFLATE), float(prop.get("growth") or 0), sale_year(prop), 0])
+                   round(float(prop.get("value") or 0)), float(prop.get("growth") or 0), sale_year(prop), 0])
 wb.save(out)
